@@ -6,7 +6,7 @@ type AuthContextValue = {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  deleteAccount: () => Promise<void>; // <--- Added this type
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -51,26 +51,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = "/login";
   };
 
-  // <--- Added this function
   const deleteAccount = async () => {
-  try {
-    if (!user) throw new Error("No user");
-    
-    // Delete user data from all tables
-    await supabase.from("pregnancy_logs").delete().eq("user_id", user.id);
-    await supabase.from("pregnancy_appointments").delete().eq("user_id", user.id);
-    await supabase.from("pregnancy_profiles").delete().eq("user_id", user.id);
-    
-    // Sign out
-    await signOut();
-  } catch (error) {
-    console.error("Error deleting account:", error);
-    throw error;
-  }
-};
+    try {
+      if (!user) throw new Error("No user");
+
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No session");
+
+      // Call the backend API to delete the account
+      const response = await fetch("/api/account", {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to delete account");
+      }
+
+      // Clear local state
+      await supabase.auth.signOut();
+      setUser(null);
+      localStorage.clear();
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      throw error;
+    }
+  };
 
   return (
-    // <--- Added deleteAccount to the value object
     <AuthContext.Provider value={{ user, loading, signOut, deleteAccount }}>
       {children}
     </AuthContext.Provider>
