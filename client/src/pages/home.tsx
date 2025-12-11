@@ -4,7 +4,6 @@ import { WeekProgress } from "@/components/week-progress";
 import { BabySizeDisplay } from "@/components/baby-size-display";
 import { DailyCheckIn } from "@/components/daily-checkin";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
-import generatedBg from "@assets/generated_images/soft_pastel_gradient_background_with_organic_shapes.png";
 import { WeeklyWisdom } from "@/components/weekly-wisdom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import generatedBg from "@/asset/soft_pastel_gradient_background_with_organic_shapes.png";
 
 type NextAppt = {
   id: string;

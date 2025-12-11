@@ -69,6 +69,8 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
           <NavItem href="/timeline" icon={Calendar} label="Timeline" />
           <NavItem href="/journal" icon={BookOpen} label="Journal" />
           <NavItem href="/appointments" icon={CalendarDays} label="Appointments" />
+          {/* Added Settings Link */}
+          <NavItem href="/settings" icon={Settings} label="Settings" />
         </nav>
       </div>
 

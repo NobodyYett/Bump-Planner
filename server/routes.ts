@@ -82,6 +82,7 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to create pregnancy log" });
     }
   });
+  
 
   return httpServer;
 }
