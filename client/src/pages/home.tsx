@@ -1,246 +1,256 @@
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
-import { WeekProgress } from "@/components/week-progress";
-import { BabySizeDisplay } from "@/components/baby-size-display";
-import { DailyCheckIn } from "@/components/daily-checkin";
-import { usePregnancyState } from "@/hooks/usePregnancyState";
-import { WeeklyWisdom } from "@/components/weekly-wisdom";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { Link } from "wouter";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { usePregnancyState, type BabySex } from "@/hooks/usePregnancyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import generatedBg from "@/asset/soft_pastel_gradient_background_with_organic_shapes.png";
+import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Loader2, Save, Trash2, AlertTriangle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-type NextAppt = {
-  id: string;
-  title: string;
-  starts_at: string;
-  location: string | null;
-};
-
-export default function Home() {
-  const {
-    dueDate,
-    setDueDate,
-    currentWeek,
-    daysRemaining,
-    trimester,
-    babyName,
-    babySex,
-    setBabyName,
+export default function SettingsPage() {
+  const { user, deleteAccount } = useAuth(); 
+  const { toast } = useToast();
+  
+  const { 
+    dueDate, 
+    setDueDate, 
+    babyName, 
+    setBabyName, 
+    babySex, 
+    setBabySex 
   } = usePregnancyState();
 
-  const { user } = useAuth();
-  const [nextAppt, setNextAppt] = useState<NextAppt | null>(null);
+  // Local state for the form inputs
+  const [nameInput, setNameInput] = useState("");
+  const [dateInput, setDateInput] = useState("");
+  const [sexInput, setSexInput] = useState<"boy" | "girl" | null>(null);
+  
+  const [isSaving, setIsSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
 
-  // local UI state for editing the name in the hero
-  const [editingName, setEditingName] = useState(false);
-  const [tempName, setTempName] = useState(babyName ?? "");
+  const email = user?.email ?? "Unknown";
 
-  // Redirect to onboarding if needed
+  // Sync local state with global state on load
   useEffect(() => {
-    const skipped = localStorage.getItem("bump_skip_due") === "true";
-    if (!dueDate && !skipped) {
-      window.location.href = "/onboarding";
-    }
-  }, [dueDate]);
+    if (babyName) setNameInput(babyName);
+    if (dueDate) setDateInput(format(new Date(dueDate), "yyyy-MM-dd"));
+    
+    // 💡 IMPROVEMENT: Concise conversion of "unknown" state to null for the UI.
+    // If babySex is "boy" or "girl", use it. Otherwise, use null.
+    setSexInput(
+      babySex && babySex !== "unknown" ? (babySex as "boy" | "girl") : null
+    );
+  }, [babyName, dueDate, babySex]);
 
-  // Keep tempName in sync if babyName changes elsewhere (e.g., onboarding)
-  useEffect(() => {
-    setTempName(babyName ?? "");
-  }, [babyName]);
-
-  // Hero title logic
-  const heroTitle =
-    !dueDate || currentWeek <= 0
-      ? "Welcome"
-      : babyName && babyName.trim().length > 0
-      ? babyName.trim()
-      : babySex === "boy"
-      ? "Baby Boy"
-      : babySex === "girl"
-      ? "Baby Girl"
-      : "Boy or Girl?";
-
-  const heroSubtitle =
-    currentWeek > 0 && daysRemaining > 0
-      ? `${daysRemaining} days to go! You're doing amazing.`
-      : currentWeek > 0 && daysRemaining <= 0
-      ? "Your due date has arrived! Best wishes! 🎉"
-      : "Let’s set your due date to start your journey.";
-
-  // Load next appointment
-  useEffect(() => {
+  // 1. SAVE PROFILE CHANGES
+  async function handleSaveChanges() {
     if (!user) return;
+    setIsSaving(true);
 
-    async function loadNext() {
-      const nowIso = new Date().toISOString();
-      const { data, error } = await supabase
-        .from("pregnancy_appointments")
-        .select("id, title, starts_at, location")
-        .eq("user_id", user.id)
-        .gte("starts_at", nowIso)
-        .order("starts_at", { ascending: true })
-        .limit(1);
+    // 💡 IMPROVEMENT: Concise conversion of local null back to "unknown" for the database/global state.
+    const sexToSave: BabySex = sexInput ?? "unknown";
 
-      if (error) {
-        console.error(error);
-        setNextAppt(null);
-        return;
-      }
+    try {
+      // Update Supabase
+      const { error } = await supabase
+        .from("pregnancy_profiles")
+        .update({
+          baby_name: nameInput,
+          due_date: dateInput,
+          baby_sex: sexToSave 
+        })
+        .eq("user_id", user.id);
 
-      setNextAppt(data?.[0] ?? null);
+      if (error) throw error;
+
+      // Update Global State
+      setBabyName(nameInput);
+      setDueDate(new Date(dateInput));
+      setBabySex(sexToSave); 
+
+      toast({
+        title: "Settings Saved",
+        description: "Your pregnancy details have been updated.",
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save changes. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
     }
-
-    loadNext();
-  }, [user]);
-
-  function handleSaveName() {
-    const cleaned = tempName.trim();
-    setBabyName(cleaned.length > 0 ? cleaned : null);
-    setEditingName(false);
   }
 
-  function handleCancelEdit() {
-    setTempName(babyName ?? "");
-    setEditingName(false);
+  // 2. DELETE ACCOUNT (True Deletion)
+  async function handleDeleteAccount() {
+    if (confirmText !== "DELETE" || !user) return;
+
+    try {
+      setDeleting(true);
+      
+      // Call the RPC function via our useAuth hook (handles permanent wipe and redirect)
+      await deleteAccount(); 
+      
+    } catch (err) {
+      console.error("Delete failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: "Could not delete account. Check your connection.",
+      });
+      setDeleting(false);
+    }
   }
 
   return (
     <Layout dueDate={dueDate} setDueDate={setDueDate}>
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+        
         {/* HEADER */}
-        <section className="relative rounded-3xl overflow-hidden p-8 md:p-12 text-white">
-          <div
-            className="absolute inset-0 bg-cover bg-center z-0"
-            style={{ backgroundImage: `url(${generatedBg})` }}
-          />
-          <div className="absolute inset-0 bg-black/10 z-10" />
+        <header className="space-y-2">
+          <h1 className="font-serif text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your pregnancy details and account preferences.
+          </p>
+        </header>
 
-          <div className="relative z-20 max-w-2xl">
-            {dueDate && currentWeek > 0 ? (
-              <>
-                {editingName ? (
-                  <div className="space-y-3 max-w-md mb-4">
-                    <label className="text-xs font-medium text-gray-700/80">
-                      Baby&apos;s name (optional)
-                    </label>
-                    <Input
-                      value={tempName}
-                      onChange={(e) => setTempName(e.target.value)}
-                      placeholder="Type baby’s name or leave blank"
-                      className="bg-white/80"
-                    />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={handleSaveName}>
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleCancelEdit}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setEditingName(true)}
-                    className="text-left group mb-2"
-                  >
-                    <h1 className="font-serif text-4xl md:text-5xl font-bold drop-shadow-sm text-gray-800">
-                      {heroTitle}
-                    </h1>
-                    <p className="text-xs mt-1 text-gray-700/80 group-hover:text-gray-900 transition-colors">
-                      Tap to edit baby&apos;s name
-                    </p>
-                  </button>
-                )}
-
-                <p className="text-lg md:text-xl opacity-90 font-medium text-gray-700">
-                  {heroSubtitle}
-                </p>
-              </>
-            ) : (
-              <>
-                <h1 className="font-serif text-4xl md:text-5xl font-bold mb-4 drop-shadow-sm text-gray-800">
-                  Welcome
-                </h1>
-                <p className="text-lg md:text-xl opacity-90 font-medium text-gray-700">
-                  {heroSubtitle}
-                </p>
-              </>
-            )}
+        {/* SECTION 1: EDIT BABY DETAILS */}
+        <section className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-muted/30 px-6 py-4 border-b border-border">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+               Pregnancy Details
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Update your info to recalculate your timeline.
+            </p>
           </div>
-        </section>
 
-        {/* MAIN GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* LEFT SIDE */}
-          <div className="md:col-span-2 space-y-8">
-            <BabySizeDisplay currentWeek={currentWeek} />
+          <div className="p-6 grid gap-6">
+            {/* Baby Name */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">Baby's Name</label>
+              <Input 
+                value={nameInput} 
+                onChange={(e) => setNameInput(e.target.value)} 
+                placeholder="e.g. Oliver" 
+              />
+            </div>
 
-            {/* CURRENT PROGRESS TILE WITH APPOINTMENT INSIDE */}
-            <div className="bg-card rounded-xl p-6 border border-border shadow-sm space-y-4">
-              <WeekProgress currentWeek={currentWeek} />
+            {/* Due Date */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">Due Date</label>
+              <Input 
+                type="date"
+                value={dateInput} 
+                onChange={(e) => setDateInput(e.target.value)} 
+              />
+            </div>
 
-              {/* NEXT APPOINTMENT BLOCK */}
-              <Link href="/appointments">
-                <div
-                  className={cn(
-                    "rounded-xl px-4 py-4 cursor-pointer transition",
-                    nextAppt
-                      ? "bg-primary/10 border border-primary/20 hover:bg-primary/20"
-                      : "bg-muted/40 border border-border hover:bg-muted"
-                  )}
-                >
-                  {nextAppt ? (
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-primary tracking-wide uppercase">
-                        Next Appointment
-                      </p>
-
-                      <p className="text-sm font-medium text-foreground">
-                        {format(
-                          new Date(nextAppt.starts_at),
-                          "EEE, MMM d • p"
-                        )}
-                      </p>
-
-                      <p className="text-sm text-muted-foreground">
-                        {nextAppt.title}
-                        {nextAppt.location ? ` • ${nextAppt.location}` : ""}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-muted-foreground tracking-wide uppercase">
-                        Next Appointment
-                      </p>
-
-                      <p className="text-sm text-muted-foreground">
-                        No upcoming appointments.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Link>
+            {/* Sex Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none">Baby's Sex</label>
+              <div className="flex gap-4">
+                <label className={cn(
+                  "flex-1 flex items-center justify-center gap-2 cursor-pointer border rounded-md px-4 py-3 transition-all",
+                  sexInput === "boy" ? "bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-200" : "hover:bg-muted"
+                )}>
+                  <input 
+                    type="radio" 
+                    name="sex" 
+                    checked={sexInput === "boy"} 
+                    onChange={() => setSexInput("boy")}
+                    className="sr-only"
+                  />
+                  <span>Boy</span>
+                </label>
+                <label className={cn(
+                  "flex-1 flex items-center justify-center gap-2 cursor-pointer border rounded-md px-4 py-3 transition-all",
+                  sexInput === "girl" ? "bg-pink-50 border-pink-200 text-pink-700 ring-1 ring-pink-200" : "hover:bg-muted"
+                )}>
+                  <input 
+                    type="radio" 
+                    name="sex" 
+                    checked={sexInput === "girl"} 
+                    onChange={() => setSexInput("girl")}
+                    className="sr-only"
+                  />
+                  <span>Girl</span>
+                </label>
+              </div>
             </div>
           </div>
 
-          {/* RIGHT SIDE */}
-          <div className="space-y-8">
-            <DailyCheckIn currentWeek={currentWeek} />
+          <div className="bg-muted/30 px-6 py-4 border-t border-border flex justify-end">
+            <Button onClick={handleSaveChanges} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
           </div>
-        </div>
+        </section>
 
-        {/* WEEKLY WISDOM */}
-        <WeeklyWisdom currentWeek={currentWeek} trimester={trimester} />
+        {/* SECTION 2: DANGER ZONE */}
+        <section className="border border-destructive/30 rounded-xl overflow-hidden">
+          <div className="bg-destructive/5 px-6 py-4 border-b border-destructive/20">
+            <h2 className="text-lg font-semibold text-destructive flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Danger Zone
+            </h2>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div className="space-y-1">
+               <p className="text-sm text-muted-foreground">
+                You are currently signed in as <span className="font-mono text-foreground font-medium">{email}</span>.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                To permanently delete your account and all data, type <span className="font-bold text-destructive">DELETE</span> below.
+              </p>
+            </div>
+
+            <div className="flex gap-4">
+              <Input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className="max-w-[200px]"
+              />
+              <Button
+                variant="destructive"
+                disabled={confirmText !== "DELETE" || deleting}
+                onClick={handleDeleteAccount}
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Account
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </section>
       </div>
     </Layout>
   );

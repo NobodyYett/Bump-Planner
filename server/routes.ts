@@ -2,12 +2,60 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertPregnancyLogSchema } from "@shared/schema";
-import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
+
+// Create admin client for user deletion
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  
+  // DELETE /api/account - Delete user account
+  app.delete("/api/account", async (req, res) => {
+    try {
+      // Get the authorization header
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const token = authHeader.split(" ")[1];
+
+      // Verify the token and get user
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      
+      if (authError || !user) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+
+      const userId = user.id;
+
+      // Delete user data from all tables
+      await supabaseAdmin.from("pregnancy_logs").delete().eq("user_id", userId);
+      await supabaseAdmin.from("pregnancy_appointments").delete().eq("user_id", userId);
+      await supabaseAdmin.from("pregnancy_profiles").delete().eq("user_id", userId);
+
+      // Delete the auth user using admin API
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      
+      if (deleteError) {
+        console.error("Error deleting auth user:", deleteError);
+        return res.status(500).json({ message: "Failed to delete user" });
+      }
+
+      res.json({ message: "Account deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
   // Pregnancy logs API routes
   
   // GET /api/pregnancy/logs - Get all pregnancy logs
@@ -54,7 +102,6 @@ export async function registerRoutes(
   // POST /api/pregnancy/logs - Create a new pregnancy log
   app.post("/api/pregnancy/logs", async (req, res) => {
     try {
-      // Validate request body with Zod
       const validationResult = insertPregnancyLogSchema.safeParse(req.body);
       
       if (!validationResult.success) {
@@ -66,7 +113,6 @@ export async function registerRoutes(
 
       const logData = validationResult.data;
       
-      // Check if a log already exists for this date
       const existingLog = await storage.getPregnancyLogByDate(logData.date);
       if (existingLog) {
         return res.status(409).json({ 
@@ -82,7 +128,6 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to create pregnancy log" });
     }
   });
-  
 
   return httpServer;
 }

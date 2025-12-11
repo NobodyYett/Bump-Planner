@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
-import { Layout } from "@/components/layout"; // Adjust import path if needed
+import { Layout } from "@/components/layout";
 import { useAuth } from "@/hooks/useAuth";
-import { usePregnancyState } from "@/hooks/usePregnancyState";
+import { usePregnancyState, type BabySex } from "@/hooks/usePregnancyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
@@ -12,9 +11,8 @@ import { Loader2, Save, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
-  const { user, deleteAccount } = useAuth(); // <--- Get deleteAccount from hook
+  const { user, deleteAccount } = useAuth(); 
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
   
   const { 
     dueDate, 
@@ -40,13 +38,20 @@ export default function SettingsPage() {
   useEffect(() => {
     if (babyName) setNameInput(babyName);
     if (dueDate) setDateInput(format(new Date(dueDate), "yyyy-MM-dd"));
-    if (babySex) setSexInput(babySex);
+    
+    // Convert global state ("unknown") to local state (null) for the UI
+    setSexInput(
+      babySex && babySex !== "unknown" ? (babySex as "boy" | "girl") : null
+    );
   }, [babyName, dueDate, babySex]);
 
   // 1. SAVE PROFILE CHANGES
   async function handleSaveChanges() {
     if (!user) return;
     setIsSaving(true);
+
+    // Convert local null back to "unknown" for the database/global state
+    const sexToSave: BabySex = sexInput ?? "unknown";
 
     try {
       // Update Supabase
@@ -55,7 +60,7 @@ export default function SettingsPage() {
         .update({
           baby_name: nameInput,
           due_date: dateInput,
-          baby_sex: sexInput
+          baby_sex: sexToSave
         })
         .eq("user_id", user.id);
 
@@ -64,7 +69,7 @@ export default function SettingsPage() {
       // Update Global State
       setBabyName(nameInput);
       setDueDate(new Date(dateInput));
-      setBabySex(sexInput);
+      setBabySex(sexToSave);
 
       toast({
         title: "Settings Saved",
@@ -90,11 +95,7 @@ export default function SettingsPage() {
       setDeleting(true);
       
       // Call the RPC function via our useAuth hook
-      // This deletes the User from auth.users AND cascades to pregnancy_profiles
       await deleteAccount(); 
-      
-      // Redirect is handled by the hook/signOut, but strictly speaking:
-      setLocation("/login");
       
     } catch (err) {
       console.error("Delete failed:", err);
