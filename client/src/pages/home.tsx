@@ -1,0 +1,247 @@
+import { useEffect, useState } from "react";
+import { Layout } from "@/components/layout";
+import { WeekProgress } from "@/components/week-progress";
+import { BabySizeDisplay } from "@/components/baby-size-display";
+import { DailyCheckIn } from "@/components/daily-checkin";
+import { usePregnancyState } from "@/hooks/usePregnancyState";
+import generatedBg from "@assets/generated_images/soft_pastel_gradient_background_with_organic_shapes.png";
+import { WeeklyWisdom } from "@/components/weekly-wisdom";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { Link } from "wouter";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+type NextAppt = {
+  id: string;
+  title: string;
+  starts_at: string;
+  location: string | null;
+};
+
+export default function Home() {
+  const {
+    dueDate,
+    setDueDate,
+    currentWeek,
+    daysRemaining,
+    trimester,
+    babyName,
+    babySex,
+    setBabyName,
+  } = usePregnancyState();
+
+  const { user } = useAuth();
+  const [nextAppt, setNextAppt] = useState<NextAppt | null>(null);
+
+  // local UI state for editing the name in the hero
+  const [editingName, setEditingName] = useState(false);
+  const [tempName, setTempName] = useState(babyName ?? "");
+
+  // Redirect to onboarding if needed
+  useEffect(() => {
+    const skipped = localStorage.getItem("bump_skip_due") === "true";
+    if (!dueDate && !skipped) {
+      window.location.href = "/onboarding";
+    }
+  }, [dueDate]);
+
+  // Keep tempName in sync if babyName changes elsewhere (e.g., onboarding)
+  useEffect(() => {
+    setTempName(babyName ?? "");
+  }, [babyName]);
+
+  // Hero title logic
+  const heroTitle =
+    !dueDate || currentWeek <= 0
+      ? "Welcome"
+      : babyName && babyName.trim().length > 0
+      ? babyName.trim()
+      : babySex === "boy"
+      ? "Baby Boy"
+      : babySex === "girl"
+      ? "Baby Girl"
+      : "Boy or Girl?";
+
+  const heroSubtitle =
+    currentWeek > 0 && daysRemaining > 0
+      ? `${daysRemaining} days to go! You're doing amazing.`
+      : currentWeek > 0 && daysRemaining <= 0
+      ? "Your due date has arrived! Best wishes! 🎉"
+      : "Let’s set your due date to start your journey.";
+
+  // Load next appointment
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadNext() {
+      const nowIso = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("pregnancy_appointments")
+        .select("id, title, starts_at, location")
+        .eq("user_id", user.id)
+        .gte("starts_at", nowIso)
+        .order("starts_at", { ascending: true })
+        .limit(1);
+
+      if (error) {
+        console.error(error);
+        setNextAppt(null);
+        return;
+      }
+
+      setNextAppt(data?.[0] ?? null);
+    }
+
+    loadNext();
+  }, [user]);
+
+  function handleSaveName() {
+    const cleaned = tempName.trim();
+    setBabyName(cleaned.length > 0 ? cleaned : null);
+    setEditingName(false);
+  }
+
+  function handleCancelEdit() {
+    setTempName(babyName ?? "");
+    setEditingName(false);
+  }
+
+  return (
+    <Layout dueDate={dueDate} setDueDate={setDueDate}>
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {/* HEADER */}
+        <section className="relative rounded-3xl overflow-hidden p-8 md:p-12 text-white">
+          <div
+            className="absolute inset-0 bg-cover bg-center z-0"
+            style={{ backgroundImage: `url(${generatedBg})` }}
+          />
+          <div className="absolute inset-0 bg-black/10 z-10" />
+
+          <div className="relative z-20 max-w-2xl">
+            {dueDate && currentWeek > 0 ? (
+              <>
+                {editingName ? (
+                  <div className="space-y-3 max-w-md mb-4">
+                    <label className="text-xs font-medium text-gray-700/80">
+                      Baby&apos;s name (optional)
+                    </label>
+                    <Input
+                      value={tempName}
+                      onChange={(e) => setTempName(e.target.value)}
+                      placeholder="Type baby’s name or leave blank"
+                      className="bg-white/80"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSaveName}>
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCancelEdit}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingName(true)}
+                    className="text-left group mb-2"
+                  >
+                    <h1 className="font-serif text-4xl md:text-5xl font-bold drop-shadow-sm text-gray-800">
+                      {heroTitle}
+                    </h1>
+                    <p className="text-xs mt-1 text-gray-700/80 group-hover:text-gray-900 transition-colors">
+                      Tap to edit baby&apos;s name
+                    </p>
+                  </button>
+                )}
+
+                <p className="text-lg md:text-xl opacity-90 font-medium text-gray-700">
+                  {heroSubtitle}
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="font-serif text-4xl md:text-5xl font-bold mb-4 drop-shadow-sm text-gray-800">
+                  Welcome
+                </h1>
+                <p className="text-lg md:text-xl opacity-90 font-medium text-gray-700">
+                  {heroSubtitle}
+                </p>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* MAIN GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* LEFT SIDE */}
+          <div className="md:col-span-2 space-y-8">
+            <BabySizeDisplay currentWeek={currentWeek} />
+
+            {/* CURRENT PROGRESS TILE WITH APPOINTMENT INSIDE */}
+            <div className="bg-card rounded-xl p-6 border border-border shadow-sm space-y-4">
+              <WeekProgress currentWeek={currentWeek} />
+
+              {/* NEXT APPOINTMENT BLOCK */}
+              <Link href="/appointments">
+                <div
+                  className={cn(
+                    "rounded-xl px-4 py-4 cursor-pointer transition",
+                    nextAppt
+                      ? "bg-primary/10 border border-primary/20 hover:bg-primary/20"
+                      : "bg-muted/40 border border-border hover:bg-muted"
+                  )}
+                >
+                  {nextAppt ? (
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-primary tracking-wide uppercase">
+                        Next Appointment
+                      </p>
+
+                      <p className="text-sm font-medium text-foreground">
+                        {format(
+                          new Date(nextAppt.starts_at),
+                          "EEE, MMM d • p"
+                        )}
+                      </p>
+
+                      <p className="text-sm text-muted-foreground">
+                        {nextAppt.title}
+                        {nextAppt.location ? ` • ${nextAppt.location}` : ""}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-muted-foreground tracking-wide uppercase">
+                        Next Appointment
+                      </p>
+
+                      <p className="text-sm text-muted-foreground">
+                        No upcoming appointments.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Link>
+            </div>
+          </div>
+
+          {/* RIGHT SIDE */}
+          <div className="space-y-8">
+            <DailyCheckIn currentWeek={currentWeek} />
+          </div>
+        </div>
+
+        {/* WEEKLY WISDOM */}
+        <WeeklyWisdom currentWeek={currentWeek} trimester={trimester} />
+      </div>
+    </Layout>
+  );
+}
