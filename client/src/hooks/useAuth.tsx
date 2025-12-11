@@ -6,6 +6,7 @@ type AuthContextValue = {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>; // <--- Added this type
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -50,8 +51,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = "/login";
   };
 
+  // <--- Added this function
+  const deleteAccount = async () => {
+  try {
+    if (!user) throw new Error("No user");
+    
+    // Delete user data from all tables
+    await supabase.from("pregnancy_logs").delete().eq("user_id", user.id);
+    await supabase.from("pregnancy_appointments").delete().eq("user_id", user.id);
+    await supabase.from("pregnancy_profiles").delete().eq("user_id", user.id);
+    
+    // Sign out
+    await signOut();
+  } catch (error) {
+    console.error("Error deleting account:", error);
+    throw error;
+  }
+};
+
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    // <--- Added deleteAccount to the value object
+    <AuthContext.Provider value={{ user, loading, signOut, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

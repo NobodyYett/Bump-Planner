@@ -12,6 +12,7 @@ import Journal from "@/pages/journal";
 import Login from "@/pages/login";
 import Onboarding from "@/pages/onboarding";
 import Appointments from "@/pages/appointments";
+import Settings from "@/pages/settings"; // <--- Imported Settings Page
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
@@ -77,6 +78,15 @@ function Router() {
         {() => (
           <RequireAuth>
             <Journal />
+          </RequireAuth>
+        )}
+      </Route>
+
+      {/* Added Settings Route */}
+      <Route path="/settings">
+        {() => (
+          <RequireAuth>
+            <Settings />
           </RequireAuth>
         )}
       </Route>
