@@ -1,9 +1,9 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: 'com.bumpplanner.app',
-  appName: 'Bump Planner',
-  webDir: 'dist'
+  appId: "com.bumpplanner.app",
+  appName: "Bump Planner",
+  webDir: "dist/public",
   bundledWebRuntime: false,
 };
 
