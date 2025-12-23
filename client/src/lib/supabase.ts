@@ -1,31 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
-function getEnv(key: string): string {
-  // Try Vite first (this is the correct source for client-side)
-  const viteVal =
-    (typeof import.meta !== "undefined" &&
-      (import.meta as any).env &&
-      (import.meta as any).env[key]) ||
-    "";
-
-  // Try Node second (only relevant for true Node runtime)
-  const nodeVal =
-    (typeof process !== "undefined" &&
-      (process as any).env &&
-      (process as any).env[key]) ||
-    "";
-
-  return viteVal || nodeVal || "";
-}
-
-const supabaseUrl = getEnv("VITE_SUPABASE_URL");
-const supabaseAnonKey = getEnv("VITE_SUPABASE_ANON_KEY");
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error(
-    "Supabase env vars missing. Need VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY available to the client at build time."
+    "Supabase env vars missing. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY exist in the Vite build environment (.env) and are prefixed with VITE_."
   );
-  // Hard fail so you don't get a vague runtime crash later
   throw new Error("Supabase env vars missing");
 }
 

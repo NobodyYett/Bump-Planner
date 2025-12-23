@@ -1,3 +1,5 @@
+// client/src/App.tsx
+
 import { useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
@@ -18,39 +20,59 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
 import { supabase } from "./lib/supabase";
 
-// Auth callback handler - processes OAuth tokens from URL
+/**
+ * OAuth callback handler
+ * Supports BOTH:
+ * - PKCE flow (recommended): ?code=...
+ * - Implicit flow (legacy): #access_token=...&refresh_token=...
+ */
 function AuthCallback() {
   const [, navigate] = useLocation();
-  
+
   useEffect(() => {
+    let cancelled = false;
+
     async function handleAuthCallback() {
-      // Get the full URL including hash fragment (where tokens live)
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const queryParams = new URLSearchParams(window.location.search);
-      
-      // Check for tokens in hash (implicit flow) or query (PKCE flow)
-      const accessToken = hashParams.get("access_token") || queryParams.get("access_token");
-      const refreshToken = hashParams.get("refresh_token") || queryParams.get("refresh_token");
-      
-      if (accessToken) {
-        // Manually set the session if tokens are present
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || "",
-        });
-        
-        if (error) {
-          console.error("Error setting session:", error);
+      try {
+        const url = window.location.href;
+        const u = new URL(url);
+
+        // ✅ PKCE: Supabase sends ?code=...
+        const code = u.searchParams.get("code");
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(url);
+          if (error) console.error("exchangeCodeForSession error:", error);
+        } else {
+          // ✅ Fallback: Implicit flow tokens
+          const hashParams = new URLSearchParams(u.hash.replace(/^#/, ""));
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+
+          if (accessToken) {
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || "",
+            });
+            if (error) console.error("setSession error:", error);
+          }
+        }
+      } catch (err) {
+        console.error("AuthCallback failed:", err);
+      } finally {
+        if (!cancelled) {
+          // Let AuthProvider onAuthStateChange drive the rest
+          navigate("/", { replace: true });
         }
       }
-      
-      // Redirect to home regardless - auth state listener will handle the rest
-      navigate("/", { replace: true });
     }
-    
+
     handleAuthCallback();
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
-  
+
   return (
     <div className="min-h-screen flex items-center justify-center text-muted-foreground">
       Completing sign in...
@@ -65,17 +87,12 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   const [, navigate] = useLocation();
 
   // Ensure a pregnancy profile exists for every authenticated user.
-  // IMPORTANT:
-  // - Your pregnancy_profiles table does NOT have an `id` column (per console error).
-  // - So we check/select `user_id` instead of `id`.
-  // - We use an UPSERT to avoid race conditions and to "create if missing" without a separate check.
   useEffect(() => {
     if (!user || authLoading) return;
 
     let cancelled = false;
 
     async function ensureProfileExists() {
-      // Quick existence check (select a column that actually exists)
       const { data: existing, error: selectError } = await supabase
         .from("pregnancy_profiles")
         .select("user_id")
@@ -84,13 +101,11 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
       if (cancelled) return;
 
-      // If lookup fails for real reasons (RLS/network/etc.), do NOT attempt insert/upsert.
       if (selectError) {
         console.error("Profile lookup failed:", selectError);
         return;
       }
 
-      // Create if missing (upsert is safest; requires user_id unique or PK)
       if (!existing) {
         const { error: upsertError } = await supabase
           .from("pregnancy_profiles")
@@ -120,9 +135,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
       return;
     }
 
-    if (isProfileLoading) {
-      return;
-    }
+    if (isProfileLoading) return;
 
     if (user && !isOnboardingComplete) {
       localStorage.removeItem("bump_skip_due");
@@ -143,9 +156,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return children;
 }
@@ -154,7 +165,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      
+
       {/* OAuth callback - handles redirect from auth providers */}
       <Route path="/auth/callback" component={AuthCallback} />
 
