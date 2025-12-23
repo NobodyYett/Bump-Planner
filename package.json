@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "build:web": "vite build",
     "build": "vite build && npx cap sync",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
-    "start": "tsx server/index.ts"
+    "start": "tsx server/index.ts",
+    "start:5001": "PORT=5001 tsx server/index.ts"
   },
   "dependencies": {
     "@capacitor/app": "^8.0.0",
