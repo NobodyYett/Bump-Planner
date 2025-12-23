@@ -7,9 +7,9 @@
 // ✅ Trusts proxy headers (important on Render / reverse proxies)
 // ✅ Graceful shutdown for SIGTERM (Render sends this on deploys)
 
-import express, { type Request, Response, NextFunction } from "express";
-import { serveStatic } from "./static";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { createServer } from "http";
+import { serveStatic } from "./static";
 
 const app = express();
 const httpServer = createServer(app);
@@ -48,7 +48,7 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: Record<string, any> | undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -75,7 +75,7 @@ function startListening(initialPort: number) {
   const isProd = process.env.NODE_ENV === "production";
 
   let port = initialPort;
-  const maxDevRetries = 10; // tries 5000..5009 in dev
+  const maxDevRetries = 10; // tries initialPort..initialPort+9 in dev
 
   const attempt = () => {
     const onError = (err: any) => {
@@ -88,7 +88,8 @@ function startListening(initialPort: number) {
 
         const base = initialPort;
         const tries = port - base;
-        if (tries < maxDevRetries) {
+
+        if (tries < maxDevRetries - 1) {
           console.warn(`Port ${port} in use, trying ${port + 1}...`);
           port += 1;
           attempt();
@@ -105,12 +106,13 @@ function startListening(initialPort: number) {
       process.exit(1);
     };
 
+    // attach the listener first
     httpServer.once("error", onError);
 
+    // then attempt listening
     httpServer.listen({ port, host }, () => {
-      // Clean up the error listener if we successfully started
+      // if we successfully started, remove the pending error handler
       httpServer.off("error", onError);
-
       log(
         `serving on http://localhost:${port} (NODE_ENV=${process.env.NODE_ENV || "unknown"})`,
         "server",
@@ -173,7 +175,8 @@ function setupGracefulShutdown() {
 
   setupGracefulShutdown();
 
-  // ✅ Render provides PORT; default to 5000 locally
+  // ✅ Render provides PORT; default locally
+  // Your preference works: PORT=5001 npm start
   const port = Number(process.env.PORT) || 5000;
   startListening(port);
 })();
