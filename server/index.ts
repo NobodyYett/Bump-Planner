@@ -1,4 +1,4 @@
-// server/index.ts (UPDATED VERSION)
+// server/index.ts (UPDATED, CLEAN VERSION)
 //
 // ✅ Works locally + on Render
 // ✅ Uses process.env.PORT (required by Render)
@@ -78,38 +78,44 @@ function startListening(initialPort: number) {
   const maxDevRetries = 10; // tries 5000..5009 in dev
 
   const attempt = () => {
-    httpServer
-      .listen({ port, host }, () => {
-        log(
-          `serving on http://localhost:${port} (NODE_ENV=${process.env.NODE_ENV || "unknown"})`,
-        );
-      })
-      .once("error", (err: any) => {
-        if (err?.code === "EADDRINUSE") {
-          if (isProd) {
-            // In production we should fail fast so Render restarts correctly
-            console.error(`Port ${port} is already in use. Exiting.`);
-            process.exit(1);
-          }
-
-          const base = initialPort;
-          const tries = port - base;
-          if (tries < maxDevRetries) {
-            console.warn(`Port ${port} in use, trying ${port + 1}...`);
-            port += 1;
-            attempt();
-            return;
-          }
-
-          console.error(
-            `Ports ${base}-${base + maxDevRetries - 1} are all in use. Stop the other server or set PORT.`,
-          );
+    const onError = (err: any) => {
+      if (err?.code === "EADDRINUSE") {
+        if (isProd) {
+          // In production we should fail fast so Render restarts correctly
+          console.error(`Port ${port} is already in use. Exiting.`);
           process.exit(1);
         }
 
-        console.error("Server listen error:", err);
+        const base = initialPort;
+        const tries = port - base;
+        if (tries < maxDevRetries) {
+          console.warn(`Port ${port} in use, trying ${port + 1}...`);
+          port += 1;
+          attempt();
+          return;
+        }
+
+        console.error(
+          `Ports ${base}-${base + maxDevRetries - 1} are all in use. Stop the other server or set PORT.`,
+        );
         process.exit(1);
-      });
+      }
+
+      console.error("Server listen error:", err);
+      process.exit(1);
+    };
+
+    httpServer.once("error", onError);
+
+    httpServer.listen({ port, host }, () => {
+      // Clean up the error listener if we successfully started
+      httpServer.off("error", onError);
+
+      log(
+        `serving on http://localhost:${port} (NODE_ENV=${process.env.NODE_ENV || "unknown"})`,
+        "server",
+      );
+    });
   };
 
   attempt();
@@ -119,6 +125,7 @@ function startListening(initialPort: number) {
 function setupGracefulShutdown() {
   const shutdown = (signal: string) => {
     log(`Received ${signal}. Shutting down...`, "server");
+
     httpServer.close(() => {
       log("HTTP server closed.", "server");
       process.exit(0);
@@ -141,6 +148,7 @@ function setupGracefulShutdown() {
   await registerRoutes(httpServer, app);
 
   // ✅ Return JSON 404 for any unknown /api routes
+  // Prevents SPA fallback from serving index.html for missing API endpoints.
   app.use("/api", (_req, res) => {
     res.status(404).json({ message: "Not found" });
   });
