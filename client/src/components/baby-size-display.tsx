@@ -1,6 +1,5 @@
 import { getWeekData } from "@/lib/pregnancy-data";
-// FIX: Changed 'assets' to 'asset' to match your file tree screenshot
-import wombT1 from "@/asset/womb/womb-t1.png"; 
+import wombT1 from "@/asset/womb/womb-t1.png";
 import wombT2 from "@/asset/womb/womb-t2.png";
 import wombT3 from "@/asset/womb/womb-t3.png";
 
@@ -9,14 +8,19 @@ interface BabySizeDisplayProps {
 }
 
 function getWombImage(week: number) {
-  if (week <= 13) return wombT1;      // 1st trimester
-  if (week <= 27) return wombT2;      // 2nd trimester
-  return wombT3;                      // 3rd trimester & beyond
+  if (week <= 13) return wombT1; // 1st trimester
+  if (week <= 27) return wombT2; // 2nd trimester
+  return wombT3; // 3rd trimester & beyond
 }
 
 export function BabySizeDisplay({ currentWeek }: BabySizeDisplayProps) {
-  // Safe fallback if data is missing
-  const weekData = getWeekData(currentWeek) || { size: "Growing", fruit: "Baby", tip: "Your baby is growing every day!" };
+  const weekData =
+    getWeekData(currentWeek) || {
+      size: "Growing",
+      fruit: "Baby",
+      tip: "Your baby is growing every day!",
+    };
+
   const wombImage = getWombImage(currentWeek);
 
   return (
@@ -26,6 +30,7 @@ export function BabySizeDisplay({ currentWeek }: BabySizeDisplayProps) {
         <p className="text-sm text-muted-foreground mb-1 uppercase tracking-wide">
           Your baby is the size of a
         </p>
+
         <h2 className="font-serif text-4xl md:text-5xl font-bold text-primary mb-2">
           {weekData.size}
         </h2>
@@ -41,13 +46,11 @@ export function BabySizeDisplay({ currentWeek }: BabySizeDisplayProps) {
 
       {/* WOMB IMAGE SIDE */}
       <div className="flex justify-center items-center flex-shrink-0">
-        {/* Container: w-48 (mobile) -> w-60 (desktop) */}
-        <div className="w- h-48 md:w-60 md:h-60 rounded-full bg-primary/5 border border-primary/100 flex items-center justify-center overflow-hidden shadow-inner">
+        <div className="w-48 h-48 md:w-60 md:h-60 rounded-full bg-primary/5 border border-primary flex items-center justify-center overflow-hidden shadow-inner">
           <img
             src={wombImage}
             alt={`Illustration of the womb around week ${currentWeek}`}
-            // FIX: object-contain ensures the full image is visible without cropping
-            className="w-3/4 h-3/4 object-contain" 
+            className="w-3/4 h-3/4 object-contain"
           />
         </div>
       </div>
