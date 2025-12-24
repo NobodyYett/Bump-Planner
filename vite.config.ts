@@ -4,12 +4,17 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
+// If you set BUILD_TARGET=mobile -> base "./" (Capacitor friendly)
+// Otherwise (default) -> base "/" (web/Render friendly)
+const isMobileBuild = process.env.BUILD_TARGET === "mobile";
+
 export default defineConfig({
-  // ✅ Load .env from project root (same folder as this config)
+  // ✅ Load .env from project root
   envDir: import.meta.dirname,
 
-  // ✅ Needed for Capacitor builds
-  base: "./",
+  // ✅ Web needs "/" so assets load on routes like /auth/callback
+  // ✅ Mobile/Capacitor needs "./" so it works from file:// or embedded webview
+  base: isMobileBuild ? "./" : "/",
 
   plugins: [react(), tailwindcss()],
 
@@ -31,7 +36,7 @@ export default defineConfig({
   root: path.resolve(import.meta.dirname, "client"),
 
   build: {
-    // ✅ Output to dist/public so Capacitor sync picks it up cleanly
+    // ✅ Output to dist/public so Capacitor sync picks it up
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
 

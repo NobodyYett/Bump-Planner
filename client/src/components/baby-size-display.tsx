@@ -42,7 +42,7 @@ export function BabySizeDisplay({ currentWeek }: BabySizeDisplayProps) {
       {/* WOMB IMAGE SIDE */}
       <div className="flex justify-center items-center flex-shrink-0">
         {/* Container: w-48 (mobile) -> w-60 (desktop) */}
-        <div className="w-48 h-48 md:w-60 md:h-60 rounded-full bg-primary/5 border border-primary/10 flex items-center justify-center overflow-hidden shadow-inner">
+        <div className="w- h-48 md:w-60 md:h-60 rounded-full bg-primary/5 border border-primary/100 flex items-center justify-center overflow-hidden shadow-inner">
           <img
             src={wombImage}
             alt={`Illustration of the womb around week ${currentWeek}`}

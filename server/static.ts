@@ -1,3 +1,4 @@
+// server/static.ts
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
@@ -8,19 +9,32 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export function serveStatic(app: Express) {
-  // We go up one level from 'server/' to find 'dist/public'
+  // dist/public from project root
   const distPath = path.resolve(__dirname, "..", "dist", "public");
+  const indexHtml = path.join(distPath, "index.html");
 
-  if (!fs.existsSync(distPath)) {
+  if (!fs.existsSync(indexHtml)) {
     throw new Error(
-      `Could not find the build directory: ${distPath}. Current __dirname is ${__dirname}. Make sure to build the client first.`,
+      `Could not find the build output: ${indexHtml}\n` +
+        `distPath: ${distPath}\n` +
+        `__dirname: ${__dirname}\n` +
+        `Did Render run: npm run build:web ?`,
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve static assets FIRST
+  app.use(
+    express.static(distPath, {
+      index: false, // do not auto-serve index.html
+      maxAge: "1y",
+      immutable: true,
+    }),
+  );
 
-  // Fall through to index.html for Single Page App (SPA) routing
-  app.get("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // SPA fallback (but NEVER hijack /api or /assets)
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api")) return next();
+    if (req.path.startsWith("/assets")) return next();
+    res.sendFile(indexHtml);
   });
 }
