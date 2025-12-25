@@ -1,14 +1,38 @@
-node_modules
-dist
+# OS junk
 .DS_Store
-__MACOSX
-server/public
+__MACOSX/
+Thumbs.db
 
+# Dependencies / build output
+node_modules/
+dist/
+.vite/
+*.log
+
+# Env files (never commit)
 .env
-.env.local
-.env.*.local
+.env.*
 **/.env
+**/.env.*
 **/.env.local
 **/.env.*.local
 
+# Archives
 *.tar.gz
+*.zip
+
+# Capacitor / Mobile generated
+android/local.properties
+android/.gradle/
+android/.idea/
+android/app/build/
+android/build/
+
+ios/DerivedData/
+ios/App/build/
+ios/App/Pods/
+ios/App/App.xcworkspace/
+ios/App/App.xcuserdata/
+
+# Optional: if you ever generate these
+coverage/

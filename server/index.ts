@@ -1,180 +1,138 @@
-// server/index.ts (UPDATED, CLEAN VERSION)
-//
-// ✅ Works locally + on Render
-// ✅ Uses process.env.PORT when provided (Render requirement)
-// ✅ Defaults to 5001 locally (your preference)
-// ✅ Handles EADDRINUSE gracefully in dev (tries next ports)
-// ✅ Doesn’t crash server after responding with an error
-// ✅ Trusts proxy headers (important on Render / reverse proxies)
-// ✅ Graceful shutdown for SIGTERM (Render sends this on deploys)
-
-import express, { type Request, Response, type NextFunction } from "express";
-import { createServer } from "http";
-import { serveStatic } from "./static";
+// server/index.ts
+import express from "express";
+import cors from "cors";
+import "dotenv/config";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
-const httpServer = createServer(app);
 
-// Render / proxies (enables correct req.ip / secure cookies behind proxy)
-app.set("trust proxy", 1);
+/**
+ * Render sets PORT. Bind 0.0.0.0 so mobile devices/emulators can reach it.
+ */
+const PORT = Number(process.env.PORT || 3000);
+const HOST = "0.0.0.0";
 
-declare module "http" {
-  interface IncomingMessage {
-    rawBody: unknown;
-  }
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in server env vars."
+  );
 }
 
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
-
-app.use(express.urlencoded({ extended: false }));
-
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-
-// Request logging for /api
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-      log(logLine);
-    }
-  });
-
-  next();
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
 });
 
-function startListening(initialPort: number) {
-  const host = "0.0.0.0";
-  const isProd = process.env.NODE_ENV === "production";
-  const maxDevRetries = 10; // tries initialPort..initialPort+9 in dev
+// Trust proxy so req.ip / secure cookies behave correctly behind Render proxy
+app.set("trust proxy", 1);
 
-  let port = initialPort;
+app.use(express.json({ limit: "1mb" }));
 
-  const attempt = () => {
-    const onError = (err: any) => {
-      if (err?.code === "EADDRINUSE") {
-        if (isProd) {
-          console.error(`Port ${port} is already in use. Exiting.`);
-          process.exit(1);
-        }
+/**
+ * CORS: allow your web app + Capacitor origins.
+ * You can also set CORS_ORIGINS="https://your-site.com,https://another.com"
+ */
+const extraOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-        const base = initialPort;
-        const tries = port - base;
+const allowedOrigins = new Set<string>([
+  "http://localhost",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://localhost",
+  "capacitor://localhost",
+  "ionic://localhost",
+  ...extraOrigins,
+]);
 
-        if (tries < maxDevRetries - 1) {
-          console.warn(`Port ${port} in use, trying ${port + 1}...`);
-          port += 1;
-          attempt();
-          return;
-        }
+app.use(
+  cors({
+    origin(origin, cb) {
+      // Allow non-browser clients with no Origin (curl, some native stacks)
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      return cb(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-        console.error(
-          `Ports ${base}-${base + maxDevRetries - 1} are all in use. Stop the other server or set PORT.`,
-        );
-        process.exit(1);
-      }
-
-      console.error("Server listen error:", err);
-      process.exit(1);
-    };
-
-    // attach the listener first
-    httpServer.once("error", onError);
-
-    // then attempt listening
-    httpServer.listen({ port, host }, () => {
-      // if we successfully started, remove the pending error handler
-      httpServer.off("error", onError);
-
-      log(
-        `serving on http://localhost:${port} (NODE_ENV=${process.env.NODE_ENV || "unknown"})`,
-        "server",
-      );
-    });
-  };
-
-  attempt();
+function getBearerToken(req: express.Request): string | null {
+  const header = req.headers.authorization;
+  if (!header) return null;
+  const [type, token] = header.split(" ");
+  if (type?.toLowerCase() !== "bearer" || !token) return null;
+  return token.trim();
 }
 
-// Graceful shutdown (Render sends SIGTERM on deploy / restart)
-function setupGracefulShutdown() {
-  const shutdown = (signal: string) => {
-    log(`Received ${signal}. Shutting down...`, "server");
-    httpServer.close(() => {
-      log("HTTP server closed.", "server");
-      process.exit(0);
-    });
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true });
+});
 
-    // Force close if something hangs
-    setTimeout(() => {
-      console.error("Force exiting after 10s shutdown timeout.");
-      process.exit(1);
-    }, 10_000).unref();
-  };
+/**
+ * Optional sanity endpoint: should return 401 if no/invalid token.
+ */
+app.get("/api/account", async (req, res) => {
+  const token = getBearerToken(req);
+  if (!token) return res.status(401).json({ error: "Missing Authorization token" });
 
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
-}
-
-(async () => {
-  // Dynamic import AFTER dotenv has loaded (per your setup)
-  const { registerRoutes } = await import("./routes");
-  await registerRoutes(httpServer, app);
-
-  // ✅ Return JSON 404 for any unknown /api routes
-  app.use("/api", (_req, res) => {
-    res.status(404).json({ message: "Not found" });
-  });
-
-  // ✅ Error handler (DO NOT throw after responding)
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err?.status || err?.statusCode || 500;
-    const message = err?.message || "Internal Server Error";
-
-    console.error("API Error:", err);
-
-    if (res.headersSent) return;
-    res.status(status).json({ message });
-  });
-
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !data?.user) {
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
 
-  setupGracefulShutdown();
- 
-  // ✅ Render provides PORT; locally you prefer 5001
-  const port = Number(process.env.PORT) || 5001;
-  startListening(port);
-})();
+  return res.status(200).json({ user_id: data.user.id, email: data.user.email });
+});
+
+/**
+ * DELETE /api/account
+ * Deletes all app data + deletes the Supabase auth user.
+ *
+ * Client must pass Authorization: Bearer <access_token>
+ */
+app.delete("/api/account", async (req, res) => {
+  try {
+    const token = getBearerToken(req);
+    if (!token) return res.status(401).json({ error: "Missing Authorization token" });
+
+    // Validate the token / get user id
+    const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+    const userId = userData.user.id;
+
+    // Delete your app tables (add any other user-owned tables here)
+    const deletes = [
+      supabaseAdmin.from("pregnancy_appointments").delete().eq("user_id", userId),
+      supabaseAdmin.from("pregnancy_logs").delete().eq("user_id", userId),
+      supabaseAdmin.from("pregnancy_profiles").delete().eq("user_id", userId),
+    ];
+
+    const results = await Promise.all(deletes);
+    const firstErr = results.find((r) => r.error)?.error;
+    if (firstErr) {
+      return res.status(500).json({ error: firstErr.message });
+    }
+
+    // Finally delete auth user
+    const { error: delAuthErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (delAuthErr) {
+      return res.status(500).json({ error: delAuthErr.message });
+    }
+
+    return res.status(204).send();
+  } catch (e: any) {
+    console.error("DELETE /api/account failed:", e);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.listen(PORT, HOST, () => {
+  console.log(`Server listening on http://${HOST}:${PORT}`);
+});

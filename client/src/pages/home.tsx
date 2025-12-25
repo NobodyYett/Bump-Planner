@@ -5,7 +5,6 @@ import { BabySizeDisplay } from "@/components/baby-size-display";
 import { DailyCheckIn } from "@/components/daily-checkin";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
 import { WeeklyWisdom } from "@/components/weekly-wisdom";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
@@ -13,13 +12,8 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import generatedBg from "@/asset/soft_pastel_gradient_background_with_organic_shapes.png";
-
-type NextAppt = {
-  id: string;
-  title: string;
-  starts_at: string;
-  location: string | null;
-};
+import { useNextAppointment } from "@/lib/appointments";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const {
@@ -34,10 +28,14 @@ export default function Home() {
   } = usePregnancyState();
 
   const { user } = useAuth();
-  const [nextAppt, setNextAppt] = useState<NextAppt | null>(null);
+
+  const { data: nextAppt, isLoading: nextApptLoading } = useNextAppointment({
+    enabled: !!user,
+  });
 
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState(babyName ?? "");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     setTempName(babyName ?? "");
@@ -61,37 +59,28 @@ export default function Home() {
       ? "Your due date has arrived! Best wishes! 🎉"
       : "Let's set your due date to start your journey.";
 
-  useEffect(() => {
+  async function handleSaveName() {
     if (!user) return;
 
-    async function loadNext() {
-      if (!user) return;
-      
-      const nowIso = new Date().toISOString();
-      const { data, error } = await supabase
-        .from("pregnancy_appointments")
-        .select("id, title, starts_at, location")
-        .eq("user_id", user.id)
-        .gte("starts_at", nowIso)
-        .order("starts_at", { ascending: true })
-        .limit(1);
-
-      if (error) {
-        console.error(error);
-        setNextAppt(null);
-        return;
-      }
-
-      setNextAppt(data?.[0] ?? null);
-    }
-
-    loadNext();
-  }, [user]);
-
-  function handleSaveName() {
     const cleaned = tempName.trim();
-    setBabyName(cleaned.length > 0 ? cleaned : null);
-    setEditingName(false);
+    const value = cleaned.length > 0 ? cleaned : null;
+
+    try {
+      setSavingName(true);
+
+      const { error } = await supabase
+        .from("pregnancy_profiles")
+        .upsert({ user_id: user.id, baby_name: value }, { onConflict: "user_id" });
+
+      if (error) throw error;
+
+      setBabyName(value);
+      setEditingName(false);
+    } catch (e) {
+      console.error("Failed to save baby name:", e);
+    } finally {
+      setSavingName(false);
+    }
   }
 
   function handleCancelEdit() {
@@ -122,15 +111,17 @@ export default function Home() {
                       onChange={(e) => setTempName(e.target.value)}
                       placeholder="Type baby's name or leave blank"
                       className="bg-white/80"
+                      disabled={savingName}
                     />
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={handleSaveName}>
-                        Save
+                      <Button size="sm" onClick={handleSaveName} disabled={savingName}>
+                        {savingName ? "Saving..." : "Save"}
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={handleCancelEdit}
+                        disabled={savingName}
                       >
                         Cancel
                       </Button>
@@ -184,7 +175,14 @@ export default function Home() {
                       : "bg-muted/40 border border-border hover:bg-muted"
                   )}
                 >
-                  {nextAppt ? (
+                  {nextApptLoading ? (
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-muted-foreground tracking-wide uppercase">
+                        Next Appointment
+                      </p>
+                      <p className="text-sm text-muted-foreground">Loading…</p>
+                    </div>
+                  ) : nextAppt ? (
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-primary tracking-wide uppercase">
                         Next Appointment

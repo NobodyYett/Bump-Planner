@@ -1,93 +1,50 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
-import { CalendarDays, Clock, MapPin } from "lucide-react";
+import { Appointment } from "@/lib/appointments";
 import { format } from "date-fns";
-import { Link } from "wouter";
+import { MapPin, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-type NextAppt = {
-  id: string;
-  title: string;
-  starts_at: string;
-  location: string | null;
+type Props = {
+  appointment: Appointment;
+  onDelete: (id: string) => void;
+  deleting?: boolean;
 };
 
-export function NextAppointmentCard() {
-  const { user } = useAuth();
-  const [nextAppt, setNextAppt] = useState<NextAppt | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-
-    async function loadNextAppt() {
-      setLoading(true);
-      const nowIso = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from("pregnancy_appointments")
-        .select("id, title, starts_at, location")
-        .eq("user_id", user.id)
-        .gte("starts_at", nowIso)
-        .order("starts_at", { ascending: true })
-        .limit(1);
-
-      setLoading(false);
-
-      if (error) {
-        console.error("Error loading next appointment:", error);
-        setNextAppt(null);
-        return;
-      }
-
-      setNextAppt(data && data.length > 0 ? (data[0] as NextAppt) : null);
-    }
-
-    loadNextAppt();
-  }, [user]);
-
+export function AppointmentCard({ appointment, onDelete, deleting }: Props) {
   return (
-    <div className="mt-6 pt-5 border-t border-border/70">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium text-foreground">
-            Next appointment
-          </h3>
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold truncate">{appointment.title}</h3>
+          </div>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            {format(new Date(appointment.starts_at), "EEE, MMM d • p")}
+          </p>
+
+          {appointment.location && (
+            <p className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              <span className="truncate">{appointment.location}</span>
+            </p>
+          )}
+
+          {appointment.notes && (
+            <p className="mt-2 text-sm text-muted-foreground">{appointment.notes}</p>
+          )}
         </div>
 
-        <Link href="/appointments">
-          <span className="text-xs text-primary hover:underline cursor-pointer">
-            View calendar
-          </span>
-        </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onDelete(appointment.id)}
+          disabled={!!deleting}
+          aria-label="Delete appointment"
+          className="shrink-0"
+        >
+          <Trash2 className="w-4 h-4 text-muted-foreground" />
+        </Button>
       </div>
-
-      {loading ? (
-        <p className="text-xs text-muted-foreground">Checking your schedule…</p>
-      ) : !nextAppt ? (
-        <p className="text-xs text-muted-foreground">
-          No upcoming appointments yet. Add one from the calendar.
-        </p>
-      ) : (
-        <Link href="/appointments">
-          <div className="mt-2 cursor-pointer rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm text-primary hover:bg-primary/15 transition-colors">
-            <div className="font-medium truncate">{nextAppt.title}</div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-primary/80">
-              <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {format(new Date(nextAppt.starts_at), "EEE, MMM d • h:mm a")}
-              </span>
-              {nextAppt.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {nextAppt.location}
-                </span>
-              )}
-            </div>
-          </div>
-        </Link>
-      )}
     </div>
   );
 }
