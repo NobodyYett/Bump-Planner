@@ -1,9 +1,9 @@
-node_modules
-dist
-.DS_Store
-__MACOSX
-server/public
+# build artifacts
+node_modules/
+dist/
+server/public/
 
+# env files
 .env
 .env.local
 .env.*.local
@@ -11,27 +11,27 @@ server/public
 **/.env.local
 **/.env.*.local
 
+# archives
 *.tar.gz
-android/local.properties
-__MACOSX/
-# Android Studio / IntelliJ
-android/.idea/
-*.iml
 
 # macOS junk
 .DS_Store
 __MACOSX/
 
-# “duplicate” files/folders created by Finder merges
-* 2*
-* 3*
-* 4*
-
-# Capacitor / Android / iOS local machine files
+# Android Studio / IntelliJ
 android/local.properties
 android/.idea/
 .idea/
+*.iml
+
+# Finder duplicate merges (common patterns)
+* 2.*
+* 3.*
+* 4.*
+* 2/
+* 3/
+* 4/
 
 # Duplicate xmls that should never be committed
-ios/**/config *.xml
-android/**/config *.xml
+ios/**/config*.xml
+android/**/config*.xml
