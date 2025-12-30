@@ -1,4 +1,4 @@
-// client/src/hooks/usePregnancyState.ts (FIXED - persists to Supabase)
+// client/src/hooks/usePregnancyState.ts (FIXED - timezone-safe date handling)
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { differenceInWeeks, differenceInDays, format } from "date-fns";
@@ -28,6 +28,13 @@ export interface PregnancyState {
   setBabyName: (name: string | null) => void;
   babySex: BabySex;
   setBabySex: (sex: BabySex) => void;
+}
+
+// Helper: parse "yyyy-MM-dd" as LOCAL date (not UTC)
+// This prevents the -1 day timezone bug
+function parseLocalDate(dateString: string): Date {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed
 }
 
 // Data fetching function for React Query
@@ -73,7 +80,8 @@ export function usePregnancyState(): PregnancyState {
   // 2. Sync fetched data to component state
   useEffect(() => {
     if (profile) {
-      setDueDateState(profile.due_date ? new Date(profile.due_date) : null);
+      // FIX: Use parseLocalDate to avoid timezone shift when loading from DB
+      setDueDateState(profile.due_date ? parseLocalDate(profile.due_date) : null);
       setBabyNameState(profile.baby_name ?? null);
       setBabySexState(profile.baby_sex ?? "unknown");
       setIsOnboardingCompleteState(profile.onboarding_complete ?? false);
@@ -88,7 +96,7 @@ export function usePregnancyState(): PregnancyState {
 
   const today = useMemo(() => new Date(), []);
 
-  // 3. FIXED: Setters now persist to Supabase
+  // 3. Setters persist to Supabase
 
   const setDueDate = useCallback(
     async (date: Date | null) => {

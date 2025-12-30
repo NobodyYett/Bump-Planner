@@ -1,4 +1,4 @@
-// client/src/components/layout.tsx (FINAL VERSION)
+// client/src/components/layout.tsx (FIXED - timezone-safe date handling)
 
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -20,10 +20,14 @@ import { useAuth } from "@/hooks/useAuth";
 
 interface LayoutProps {
   children: React.ReactNode;
-  // FIX: Change type from Date | undefined to Date | null
-  dueDate: Date | null; 
-  // FIX: Change function signature from Date | undefined to Date | null
-  setDueDate: (date: Date | null) => void; 
+  dueDate: Date | null;
+  setDueDate: (date: Date | null) => void;
+}
+
+// Helper: parse "yyyy-MM-dd" as LOCAL date (not UTC)
+function parseLocalDate(dateString: string): Date {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed
 }
 
 export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
@@ -73,7 +77,6 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
           <NavItem href="/timeline" icon={Calendar} label="Timeline" />
           <NavItem href="/journal" icon={BookOpen} label="Journal" />
           <NavItem href="/appointments" icon={CalendarDays} label="Appointments" />
-          {/* Added Settings Link */}
           <NavItem href="/settings" icon={Settings} label="Settings" />
         </nav>
       </div>
@@ -89,8 +92,8 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
             className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             value={dueDate ? format(dueDate, "yyyy-MM-dd") : ""}
             onChange={(e) => {
-              // FIX: Pass null instead of undefined if the date input is cleared
-              const date = e.target.value ? new Date(e.target.value) : null;
+              // FIX: Parse as local date to avoid timezone shift
+              const date = e.target.value ? parseLocalDate(e.target.value) : null;
               setDueDate(date);
             }}
           />

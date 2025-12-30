@@ -10,6 +10,16 @@ import { format, differenceInDays } from "date-fns";
 import { Loader2, Save, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+// Helper: parse "yyyy-MM-dd" as LOCAL date (not UTC)
+// This prevents the -1 day timezone bug
+function parseLocalDate(dateString: string): Date | null {
+  const trimmed = dateString.trim();
+  if (!trimmed) return null;
+  const [year, month, day] = trimmed.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day); // month is 0-indexed
+}
+
 export default function SettingsPage() {
   const { user, deleteAccount } = useAuth();
   const { toast } = useToast();
@@ -37,20 +47,13 @@ export default function SettingsPage() {
   // Sync local state with global state on load
   useEffect(() => {
     setNameInput(babyName ?? "");
-    setDateInput(dueDate ? format(new Date(dueDate), "yyyy-MM-dd") : "");
+    setDateInput(dueDate ? format(dueDate, "yyyy-MM-dd") : "");
 
     // Convert global state ("unknown") to local state (null) for the UI
     setSexInput(
       babySex && babySex !== "unknown" ? (babySex as "boy" | "girl") : null,
     );
   }, [babyName, dueDate, babySex]);
-
-  function parseDateInputToDate(value: string): Date | null {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const d = new Date(trimmed);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
 
   // 1. SAVE PROFILE CHANGES
   async function handleSaveChanges() {
@@ -59,7 +62,8 @@ export default function SettingsPage() {
 
     // Convert local null back to "unknown" for the database/global state
     const sexToSave: BabySex = sexInput ?? "unknown";
-    const parsedDueDate = parseDateInputToDate(dateInput);
+    // FIX: Use parseLocalDate instead of new Date()
+    const parsedDueDate = parseLocalDate(dateInput);
 
     // Optional guardrail: sanity check due date window
     // Allows: up to 30 days past (late edits/post-birth) and up to ~44 weeks ahead
