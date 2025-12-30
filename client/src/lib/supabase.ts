@@ -10,4 +10,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Supabase env vars missing");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    detectSessionInUrl: true,  // Detects OAuth tokens in URL after redirect
+    flowType: 'pkce',          // Required for Apple Sign-In (more secure)
+    autoRefreshToken: true,    // Automatically refresh expired tokens
+    persistSession: true,      // Persist session to localStorage
+  }
+});
