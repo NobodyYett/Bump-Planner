@@ -1,3 +1,5 @@
+// client/src/pages/settings.tsx
+
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays } from "date-fns";
-import { Loader2, Save, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Save, Trash2, AlertTriangle, Sun, Moon, Monitor } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme, type ThemeMode } from "@/theme/theme-provider";
 
 // Helper: parse "yyyy-MM-dd" as LOCAL date (not UTC)
 // This prevents the -1 day timezone bug
@@ -23,6 +26,7 @@ function parseLocalDate(dateString: string): Date | null {
 export default function SettingsPage() {
   const { user, deleteAccount } = useAuth();
   const { toast } = useToast();
+  const { mode, setMode } = useTheme();
 
   const {
     dueDate,
@@ -131,6 +135,13 @@ export default function SettingsPage() {
     }
   }
 
+  // Theme options
+  const themeOptions: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
+    { value: "system", label: "System", icon: <Monitor className="w-4 h-4" /> },
+    { value: "light", label: "Light", icon: <Sun className="w-4 h-4" /> },
+    { value: "dark", label: "Dark", icon: <Moon className="w-4 h-4" /> },
+  ];
+
   return (
     <Layout dueDate={dueDate} setDueDate={setDueDate}>
       <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
@@ -143,6 +154,46 @@ export default function SettingsPage() {
           </p>
         </header>
 
+        {/* Appearance Section */}
+        <section className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-muted/30 px-6 py-4 border-b border-border">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              Appearance
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Choose how Bump Planner looks to you.
+            </p>
+          </div>
+
+          <div className="p-6">
+            <div className="space-y-3">
+              <label className="text-sm font-medium leading-none">Theme</label>
+              <div className="flex gap-3">
+                {themeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setMode(option.value)}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 cursor-pointer border rounded-lg px-4 py-3 transition-all",
+                      mode === option.value
+                        ? "bg-primary/10 border-primary text-primary ring-1 ring-primary/20"
+                        : "hover:bg-muted border-border"
+                    )}
+                  >
+                    {option.icon}
+                    <span className="text-sm font-medium">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                System matches your device appearance.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Pregnancy Details Section */}
         <section className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
           <div className="bg-muted/30 px-6 py-4 border-b border-border">
             <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -183,7 +234,7 @@ export default function SettingsPage() {
                   className={cn(
                     "flex-1 flex items-center justify-center gap-2 cursor-pointer border rounded-md px-4 py-3 transition-all",
                     sexInput === "boy"
-                      ? "bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-200"
+                      ? "bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-300"
                       : "hover:bg-muted",
                   )}
                 >
@@ -201,7 +252,7 @@ export default function SettingsPage() {
                   className={cn(
                     "flex-1 flex items-center justify-center gap-2 cursor-pointer border rounded-md px-4 py-3 transition-all",
                     sexInput === "girl"
-                      ? "bg-pink-50 border-pink-200 text-pink-700 ring-1 ring-pink-200"
+                      ? "bg-pink-50 border-pink-200 text-pink-700 ring-1 ring-pink-200 dark:bg-pink-950 dark:border-pink-800 dark:text-pink-300"
                       : "hover:bg-muted",
                   )}
                 >
@@ -235,6 +286,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Danger Zone */}
         <section className="border border-destructive/30 rounded-xl overflow-hidden">
           <div className="bg-destructive/5 px-6 py-4 border-b border-destructive/20">
             <h2 className="text-lg font-semibold text-destructive flex items-center gap-2">

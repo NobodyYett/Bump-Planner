@@ -13,9 +13,9 @@ export function WeekProgress({ currentWeek }: WeekProgressProps) {
   const weekData = getWeekData(displayWeek);
   
   const trimesterColors = {
-    1: "bg-blue-200 text-blue-700",
-    2: "bg-purple-200 text-purple-700",
-    3: "bg-pink-200 text-pink-700",
+    1: "bg-blue-200 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300",
+    2: "bg-purple-200 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300",
+    3: "bg-pink-200 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300",
   };
 
   return (

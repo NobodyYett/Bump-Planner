@@ -17,25 +17,25 @@ export default function Timeline() {
 
   const trimesterColors = {
     1: {
-      bg: "bg-blue-50",
-      border: "border-blue-200",
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      border: "border-blue-200 dark:border-blue-800",
       accent: "bg-blue-500",
-      text: "text-blue-700",
-      lightText: "text-blue-600",
+      text: "text-blue-700 dark:text-blue-300",
+      lightText: "text-blue-600 dark:text-blue-400",
     },
     2: {
-      bg: "bg-purple-50",
-      border: "border-purple-200",
+      bg: "bg-purple-50 dark:bg-purple-950/30",
+      border: "border-purple-200 dark:border-purple-800",
       accent: "bg-purple-500",
-      text: "text-purple-700",
-      lightText: "text-purple-600",
+      text: "text-purple-700 dark:text-purple-300",
+      lightText: "text-purple-600 dark:text-purple-400",
     },
     3: {
-      bg: "bg-pink-50",
-      border: "border-pink-200",
+      bg: "bg-pink-50 dark:bg-pink-950/30",
+      border: "border-pink-200 dark:border-pink-800",
       accent: "bg-pink-500",
-      text: "text-pink-700",
-      lightText: "text-pink-600",
+      text: "text-pink-700 dark:text-pink-300",
+      lightText: "text-pink-600 dark:text-pink-400",
     },
   };
 
@@ -98,22 +98,22 @@ export default function Timeline() {
                         transition={{ delay: week.week * 0.02 }}
                         className={cn(
                           "relative rounded-xl p-4 border transition-all",
-                          isCurrent && "ring-2 ring-primary ring-offset-2 bg-white shadow-lg",
-                          isPast && "bg-white/60 border-gray-200",
-                          isFuture && "bg-white/40 border-gray-100"
+                          isCurrent && "ring-2 ring-primary ring-offset-2 ring-offset-background bg-card shadow-lg",
+                          isPast && "bg-card/60 dark:bg-card/40 border-border",
+                          isFuture && "bg-card/40 dark:bg-card/20 border-border/50"
                         )}
                       >
                         {/* Week Number Badge */}
                         <div className="flex items-center justify-between mb-3">
                           <span className={cn(
                             "text-sm font-semibold",
-                            isCurrent ? "text-primary" : isPast ? "text-gray-600" : "text-gray-400"
+                            isCurrent ? "text-primary" : isPast ? "text-muted-foreground" : "text-muted-foreground/50"
                           )}>
                             Week {week.week}
                           </span>
                           {isPast && (
-                            <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-                              <Check className="w-3 h-3 text-green-600" />
+                            <div className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                              <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
                             </div>
                           )}
                           {isCurrent && (
@@ -126,7 +126,7 @@ export default function Timeline() {
                         {/* Baby Size */}
                         <div className={cn(
                           "font-serif text-lg font-medium mb-1",
-                          isCurrent ? "text-foreground" : isPast ? "text-gray-700" : "text-gray-400"
+                          isCurrent ? "text-foreground" : isPast ? "text-foreground/80" : "text-muted-foreground/50"
                         )}>
                           {week.fruit}
                         </div>
@@ -134,14 +134,14 @@ export default function Timeline() {
                         {/* Size Info */}
                         <div className={cn(
                           "text-xs mb-2",
-                          isCurrent ? "text-muted-foreground" : isPast ? "text-gray-500" : "text-gray-300"
+                          isCurrent ? "text-muted-foreground" : isPast ? "text-muted-foreground/80" : "text-muted-foreground/40"
                         )}>
                           ~{week.size}
                         </div>
 
                         {/* Tip (only show for current week or on hover) */}
                         {isCurrent && (
-                          <p className="text-xs text-muted-foreground mt-2 leading-relaxed border-t pt-2 border-gray-100">
+                          <p className="text-xs text-muted-foreground mt-2 leading-relaxed border-t pt-2 border-border">
                             {week.tip}
                           </p>
                         )}
