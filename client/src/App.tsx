@@ -16,6 +16,7 @@ import Login from "@/pages/login";
 import Onboarding from "@/pages/onboarding";
 import Appointments from "@/pages/appointments";
 import Settings from "@/pages/settings";
+import AiPage from "@/pages/ai";
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
@@ -303,6 +304,14 @@ function Router() {
         {() => (
           <RequireAuth>
             <Settings />
+          </RequireAuth>
+        )}
+      </Route>
+
+      <Route path="/ai">
+        {() => (
+          <RequireAuth>
+            <AiPage />
           </RequireAuth>
         )}
       </Route>

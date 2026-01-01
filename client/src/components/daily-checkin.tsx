@@ -1,16 +1,43 @@
 // client/src/components/daily-checkin.tsx
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Smile, Frown, Meh, Loader2 } from "lucide-react";
+import { Smile, Frown, Meh, Loader2, Sun, Sunset, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useCreatePregnancyLog, useTodayLogs } from "@/hooks/usePregnancyLogs";
 import { format } from "date-fns";
+import {
+  type CheckinSlot,
+  getSuggestedSlot,
+  getSlotLabel,
+  ALL_SLOTS,
+} from "@/lib/checkinSlots";
 
 interface DailyCheckInProps {
   currentWeek: number;
 }
+
+// Common symptom chips for quick selection
+const SYMPTOM_CHIPS = [
+  "Nausea",
+  "Fatigue",
+  "Headache",
+  "Back pain",
+  "Cramps",
+  "Heartburn",
+  "Swelling",
+  "Insomnia",
+  "Mood swings",
+  "Cravings",
+];
+
+const slotIcons: Record<CheckinSlot, React.ReactNode> = {
+  morning: <Sun className="w-4 h-4" />,
+  evening: <Sunset className="w-4 h-4" />,
+  night: <Moon className="w-4 h-4" />,
+};
 
 export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
   const { toast } = useToast();
@@ -22,15 +49,34 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
   const createLogMutation = useCreatePregnancyLog();
 
   // Form state
+  const [selectedSlot, setSelectedSlot] = useState<CheckinSlot>(() => getSuggestedSlot());
   const [selectedMood, setSelectedMood] = useState<"happy" | "neutral" | "sad" | null>(null);
-  const [symptoms, setSymptoms] = useState("");
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+
+  // Reset slot to suggested when date changes
+  useEffect(() => {
+    setSelectedSlot(getSuggestedSlot());
+  }, [todayDate]);
+
+  // Check which slots are already completed today
+  const completedSlots = new Set(
+    todayLogs.map((log: any) => log.slot || log.time_of_day).filter(Boolean)
+  );
+
+  function toggleSymptom(symptom: string) {
+    setSelectedSymptoms((prev) =>
+      prev.includes(symptom)
+        ? prev.filter((s) => s !== symptom)
+        : [...prev, symptom]
+    );
+  }
 
   async function saveCheckin() {
     if (!selectedMood) {
       toast({
         title: "Please select a mood",
-        description: "Let us know how you're feeling today.",
+        description: "Let us know how you're feeling.",
         variant: "destructive",
       });
       return;
@@ -41,18 +87,19 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
         date: todayDate,
         week: currentWeek,
         mood: selectedMood,
-        symptoms: symptoms.trim() ? symptoms.trim() : undefined,
+        slot: selectedSlot,
+        symptoms: selectedSymptoms.length > 0 ? selectedSymptoms.join(", ") : undefined,
         notes: notes.trim() ? notes.trim() : undefined,
       });
 
       toast({
         title: "Check-in saved!",
-        description: "Thanks for tracking your day.",
+        description: `${getSlotLabel(selectedSlot)} check-in recorded.`,
       });
 
       // Reset form
       setSelectedMood(null);
-      setSymptoms("");
+      setSelectedSymptoms([]);
       setNotes("");
     } catch (error) {
       toast({
@@ -87,6 +134,12 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
     }
   };
 
+  const slotLabel = (log: any) => {
+    const slot = log?.slot || log?.time_of_day;
+    if (!slot) return "";
+    return getSlotLabel(slot as CheckinSlot);
+  };
+
   const previewText = (log: any) => {
     const raw =
       (log?.notes && String(log.notes)) ||
@@ -108,23 +161,58 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
 
   const hasAnyLogs = todayLogs.length > 0;
   const lastTwo = hasAnyLogs ? todayLogs.slice(-2).reverse() : [];
+  const suggestedSlot = getSuggestedSlot();
+  const suggestedSlotCompleted = completedSlots.has(suggestedSlot);
 
   const moodBtnBase =
     "flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-lg border transition-all min-w-0";
   const moodBtnInactive = "border-border hover:bg-muted";
   const moodBtnActive = "border-primary bg-primary/5 text-primary";
 
+  const slotBtnBase =
+    "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border transition-all text-sm";
+  const slotBtnInactive = "border-border hover:bg-muted text-muted-foreground";
+  const slotBtnActive = "border-primary bg-primary/10 text-primary font-medium";
+  const slotBtnCompleted = "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400";
+
   return (
     <div className={cardClass}>
       {/* Header */}
       <div className="text-center">
         <h3 className="font-serif text-2xl font-semibold">Daily Check-in</h3>
-        <p className="text-base text-muted-foreground mt-1">
-          How are you feeling right now?
+        <p className="text-sm text-muted-foreground mt-1">
+          {suggestedSlotCompleted 
+            ? "Add another check-in anytime" 
+            : "How are you feeling right now?"}
         </p>
       </div>
 
-      {/* Mood buttons - centered and responsive */}
+      {/* Slot Selector */}
+      <div className="mt-4 flex gap-2">
+        {ALL_SLOTS.map((slot) => {
+          const isCompleted = completedSlots.has(slot);
+          const isSelected = selectedSlot === slot;
+          return (
+            <button
+              key={slot}
+              type="button"
+              onClick={() => setSelectedSlot(slot)}
+              className={cn(
+                slotBtnBase,
+                isSelected && !isCompleted && slotBtnActive,
+                isCompleted && slotBtnCompleted,
+                !isSelected && !isCompleted && slotBtnInactive
+              )}
+            >
+              {slotIcons[slot]}
+              <span>{getSlotLabel(slot)}</span>
+              {isCompleted && <span className="text-xs">✓</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Mood buttons */}
       <div className="mt-4 flex gap-2 w-full">
         <button
           type="button"
@@ -169,60 +257,61 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
         </button>
       </div>
 
-      {/* Always visible: Selected indicator + Symptoms + Notes + Save */}
-      <div className="mt-4 space-y-3">
-        {selectedMood && (
-          <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
-            {moodIcon(selectedMood)}
-            <span>
-              Selected: <span className="font-medium">feeling {moodLabel(selectedMood)}</span>
-            </span>
-          </div>
-        )}
-
-        <div>
-          <div className="text-xs font-medium mb-1">Symptoms (optional)</div>
-          <Textarea
-            value={symptoms}
-            onChange={(e) => setSymptoms(e.target.value)}
-            placeholder="Any symptoms right now?"
-            className="resize-none bg-background"
-            rows={2}
-          />
+      {/* Symptom Chips */}
+      <div className="mt-4 space-y-2">
+        <div className="text-xs font-medium">Symptoms (optional)</div>
+        <div className="flex flex-wrap gap-2">
+          {SYMPTOM_CHIPS.map((symptom) => (
+            <button
+              key={symptom}
+              type="button"
+              onClick={() => toggleSymptom(symptom)}
+              className={cn(
+                "px-3 py-1.5 text-xs rounded-full border transition-all",
+                selectedSymptoms.includes(symptom)
+                  ? "bg-primary/10 border-primary text-primary"
+                  : "border-border hover:bg-muted text-muted-foreground"
+              )}
+            >
+              {symptom}
+            </button>
+          ))}
         </div>
-
-        <div>
-          <div className="text-xs font-medium mb-1">Notes (optional)</div>
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anything you want to remember?"
-            className="resize-none bg-background"
-            rows={2}
-          />
-        </div>
-
-        <Button
-          className="w-full"
-          onClick={saveCheckin}
-          disabled={createLogMutation.isPending}
-        >
-          {createLogMutation.isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            "Save check-in"
-          )}
-        </Button>
       </div>
 
-      {/* Previous entries section - only show if there are logs */}
+      {/* Notes */}
+      <div className="mt-4 space-y-2">
+        <div className="text-xs font-medium">Notes (optional)</div>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Anything you want to remember?"
+          className="resize-none bg-background"
+          rows={2}
+        />
+      </div>
+
+      {/* Save Button */}
+      <Button
+        className="w-full mt-4"
+        onClick={saveCheckin}
+        disabled={createLogMutation.isPending}
+      >
+        {createLogMutation.isPending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Saving...
+          </>
+        ) : (
+          `Save ${getSlotLabel(selectedSlot)} check-in`
+        )}
+      </Button>
+
+      {/* Previous entries section */}
       {hasAnyLogs && (
         <>
           <p className="text-sm text-muted-foreground mt-5 text-center">
-            Here's how today's been feeling so far.
+            Today's check-ins
           </p>
 
           <div className="space-y-2 mt-3">
@@ -235,15 +324,22 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
                   {moodIcon(log?.mood)}
                 </div>
 
-                <div className="space-y-0.5">
-                  <div className="text-xs text-muted-foreground">
-                    {timeLabel(log)}{" "}
-                    {log?.mood ? `• feeling ${moodLabel(log.mood)}` : ""}
+                <div className="space-y-0.5 flex-1 min-w-0">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <span className="font-medium">{slotLabel(log)}</span>
+                    <span>•</span>
+                    <span>{timeLabel(log)}</span>
+                    {log?.mood && (
+                      <>
+                        <span>•</span>
+                        <span>feeling {moodLabel(log.mood)}</span>
+                      </>
+                    )}
                   </div>
 
                   {previewText(log) ? (
-                    <div className="text-sm text-foreground leading-snug">
-                      "{previewText(log)}"
+                    <div className="text-sm text-foreground leading-snug truncate">
+                      {previewText(log)}
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground italic">

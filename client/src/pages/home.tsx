@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+// client/src/pages/home.tsx
+
+import { useEffect, useState, useMemo } from "react";
 import { Layout } from "@/components/layout";
 import { WeekProgress } from "@/components/week-progress";
 import { BabySizeDisplay } from "@/components/baby-size-display";
 import { DailyCheckIn } from "@/components/daily-checkin";
+import { GentleNudge } from "@/components/gentle-nudge";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
 import { WeeklyWisdom } from "@/components/weekly-wisdom";
+import { useTodayLogs } from "@/hooks/usePregnancyLogs";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
@@ -12,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Sparkles } from "lucide-react";
 import generatedBg from "@/asset/soft_pastel_gradient_background_with_organic_shapes.png";
 
 type NextAppt = {
@@ -31,13 +36,58 @@ export default function Home() {
     babyName,
     babySex,
     setBabyName,
+    momName,
+    partnerName,
   } = usePregnancyState();
 
   const { user } = useAuth();
   const [nextAppt, setNextAppt] = useState<NextAppt | null>(null);
-
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState(babyName ?? "");
+
+  // Get today's check-ins for nudge context
+  const todayDate = format(new Date(), "yyyy-MM-dd");
+  const { data: todayLogs = [] } = useTodayLogs(todayDate);
+
+  // Extract check-in context for nudge (most recent check-in)
+  const checkinContext = useMemo(() => {
+    if (todayLogs.length === 0) return null;
+    
+    const mostRecent = todayLogs[todayLogs.length - 1];
+    const symptoms = mostRecent?.symptoms
+      ? String(mostRecent.symptoms).split(",").map((s: string) => s.trim())
+      : [];
+    
+    return {
+      mood: mostRecent?.mood as "happy" | "neutral" | "sad" | null,
+      symptoms,
+    };
+  }, [todayLogs]);
+
+  // Build AI route URL with prefilled context
+  const aiRouteUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("week", String(currentWeek));
+    
+    if (checkinContext) {
+      if (checkinContext.mood) {
+        params.set("mood", checkinContext.mood);
+      }
+      if (checkinContext.symptoms && checkinContext.symptoms.length > 0) {
+        params.set("symptoms", checkinContext.symptoms.join(", "));
+      }
+      
+      const mostRecent = todayLogs[todayLogs.length - 1];
+      if (mostRecent?.slot) {
+        params.set("slot", mostRecent.slot);
+      }
+      if (mostRecent?.notes) {
+        params.set("notes", String(mostRecent.notes));
+      }
+    }
+    
+    return `/ai?${params.toString()}`;
+  }, [currentWeek, checkinContext, todayLogs]);
 
   useEffect(() => {
     setTempName(babyName ?? "");
@@ -58,8 +108,16 @@ export default function Home() {
     currentWeek > 0 && daysRemaining > 0
       ? `${daysRemaining} days to go! You're doing amazing.`
       : currentWeek > 0 && daysRemaining <= 0
-      ? "Your due date has arrived! Best wishes! 🎉"
+      ? "Your due date has arrived! Best wishes!"
       : "Let's set your due date to start your journey.";
+
+  // Build parent pills
+  const parentPills = useMemo(() => {
+    const pills: string[] = [];
+    if (momName && momName.trim()) pills.push(momName.trim());
+    if (partnerName && partnerName.trim()) pills.push(partnerName.trim());
+    return pills;
+  }, [momName, partnerName]);
 
   useEffect(() => {
     if (!user) return;
@@ -102,14 +160,15 @@ export default function Home() {
   return (
     <Layout dueDate={dueDate} setDueDate={setDueDate}>
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <section className="relative rounded-3xl overflow-hidden p-8 md:p-12 text-white">
+        {/* Hero Section - Enhanced visual presence */}
+        <section className="relative rounded-3xl overflow-hidden p-10 md:p-14 text-white">
           <div
             className="absolute inset-0 bg-cover bg-center z-0"
             style={{ backgroundImage: `url(${generatedBg})` }}
           />
           <div className="absolute inset-0 bg-black/10 z-10" />
 
-          <div className="relative z-20 max-w-2xl">
+          <div className="relative z-20 max-w-3xl">
             {dueDate && currentWeek > 0 ? (
               <>
                 {editingName ? (
@@ -142,7 +201,7 @@ export default function Home() {
                     onClick={() => setEditingName(true)}
                     className="text-left group mb-2"
                   >
-                    <h1 className="font-serif text-4xl md:text-5xl font-bold drop-shadow-sm text-gray-800">
+                    <h1 className="font-serif text-5xl md:text-6xl font-bold drop-shadow-sm text-gray-800 tracking-tight">
                       {heroTitle}
                     </h1>
                     <p className="text-xs mt-1 text-gray-700/80 group-hover:text-gray-900 transition-colors">
@@ -151,16 +210,30 @@ export default function Home() {
                   </button>
                 )}
 
-                <p className="text-lg md:text-xl opacity-90 font-medium text-gray-700">
+                {/* Parent name pills */}
+                {parentPills.length > 0 && (
+                  <div className="flex gap-2 mt-3 mb-4">
+                    {parentPills.map((name, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/30 text-gray-800 backdrop-blur-sm"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-xl md:text-2xl opacity-90 font-medium text-gray-700">
                   {heroSubtitle}
                 </p>
               </>
             ) : (
               <>
-                <h1 className="font-serif text-4xl md:text-5xl font-bold mb-4 drop-shadow-sm text-gray-800">
+                <h1 className="font-serif text-5xl md:text-6xl font-bold mb-4 drop-shadow-sm text-gray-800 tracking-tight">
                   Welcome
                 </h1>
-                <p className="text-lg md:text-xl opacity-90 font-medium text-gray-700">
+                <p className="text-xl md:text-2xl opacity-90 font-medium text-gray-700">
                   {heroSubtitle}
                 </p>
               </>
@@ -171,6 +244,9 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-8">
             <BabySizeDisplay currentWeek={currentWeek} />
+
+            {/* Gentle Nudge - Directly ABOVE WeekProgress */}
+            <GentleNudge checkinContext={checkinContext} />
 
             <div className="bg-card rounded-xl p-6 border border-border shadow-sm space-y-4">
               <WeekProgress currentWeek={currentWeek} />
@@ -210,6 +286,31 @@ export default function Home() {
                 </div>
               </Link>
             </div>
+
+            {/* "Is this normal…?" - Matches Weekly Wisdom styling */}
+            <Link href={aiRouteUrl}>
+              <div
+                className={cn(
+                  "flex items-center gap-3 p-4 rounded-xl cursor-pointer",
+                  "bg-primary/10 border border-primary/20",
+                  "hover:bg-primary/15 transition-colors"
+                )}
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-sm text-foreground">Is this normal…?</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ask FLO about your symptoms
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  FLO
+                </span>
+              </div>
+            </Link>
           </div>
 
           <div className="space-y-8">

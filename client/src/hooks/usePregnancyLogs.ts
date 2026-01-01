@@ -1,7 +1,9 @@
 // client/src/hooks/usePregnancyLogs.ts
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { type CheckinSlot, getSuggestedSlot } from "@/lib/checkinSlots";
 
 // ---- helpers ----
 
@@ -11,6 +13,7 @@ type CreateLogInput = {
   date: string; // "yyyy-MM-dd"
   week: number;
   mood: Mood;
+  slot?: CheckinSlot; // New: optional slot (morning/evening/night)
   symptoms?: string;
   notes?: string;
 };
@@ -27,6 +30,7 @@ function normalizeLogRow<T extends Record<string, any>>(row: T): T & { createdAt
   return row as any;
 }
 
+// Legacy helper - maps to new slot system for backwards compat
 export function getTimeOfDaySlot(
   d: Date = new Date(),
 ): "morning" | "afternoon" | "evening" {
@@ -105,8 +109,8 @@ export function useCreatePregnancyLog() {
         throw new Error("Not authenticated");
       }
 
-      const now = new Date();
-      const timeOfDay = getTimeOfDaySlot(now);
+      // Use provided slot or fall back to suggested slot based on time
+      const slot = input.slot ?? getSuggestedSlot();
 
       const { data, error } = await supabase
         .from("pregnancy_logs")
@@ -117,7 +121,8 @@ export function useCreatePregnancyLog() {
           mood: input.mood,
           symptoms: input.symptoms ?? null,
           notes: input.notes ?? null,
-          time_of_day: timeOfDay,
+          slot: slot, // New field
+          time_of_day: slot, // Keep for backwards compat with existing column
         })
         .select("*")
         .single();
@@ -129,7 +134,7 @@ export function useCreatePregnancyLog() {
       // refresh overall list + today's list
       queryClient.invalidateQueries({ queryKey: ["pregnancyLogs"] });
       queryClient.invalidateQueries({
-        queryKey: ["pregnancyLogs", "today", vars.date],
+        queryKey: ["pregnancyLogs", "today", user?.id, vars.date],
       });
     },
   });

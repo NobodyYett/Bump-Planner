@@ -1,4 +1,4 @@
-// client/src/hooks/usePregnancyState.ts (FIXED - timezone-safe date handling)
+// client/src/hooks/usePregnancyState.ts
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { differenceInWeeks, differenceInDays, format } from "date-fns";
@@ -28,13 +28,18 @@ export interface PregnancyState {
   setBabyName: (name: string | null) => void;
   babySex: BabySex;
   setBabySex: (sex: BabySex) => void;
+
+  // Parent names
+  momName: string | null;
+  setMomName: (name: string | null) => void;
+  partnerName: string | null;
+  setPartnerName: (name: string | null) => void;
 }
 
 // Helper: parse "yyyy-MM-dd" as LOCAL date (not UTC)
-// This prevents the -1 day timezone bug
 function parseLocalDate(dateString: string): Date {
   const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day); // month is 0-indexed
+  return new Date(year, month - 1, day);
 }
 
 // Data fetching function for React Query
@@ -43,7 +48,7 @@ const fetchProfileData = async (userId: string | undefined) => {
 
   const { data, error } = await supabase
     .from("pregnancy_profiles")
-    .select("due_date, baby_name, baby_sex, onboarding_complete")
+    .select("due_date, baby_name, baby_sex, onboarding_complete, mom_name, partner_name")
     .eq("user_id", userId)
     .single();
 
@@ -58,7 +63,6 @@ export function usePregnancyState(): PregnancyState {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 
-  // 1. Fetch profile data using React Query
   const {
     data: profile,
     isLoading: isProfileFetching,
@@ -70,61 +74,49 @@ export function usePregnancyState(): PregnancyState {
     staleTime: 1000 * 60,
   });
 
-  // Local state initialized to null/unknown/false until data is loaded
   const [dueDate, setDueDateState] = useState<Date | null>(null);
   const [babyNameState, setBabyNameState] = useState<string | null>(null);
   const [babySexState, setBabySexState] = useState<BabySex>("unknown");
-  const [isOnboardingCompleteState, setIsOnboardingCompleteState] =
-    useState(false);
+  const [isOnboardingCompleteState, setIsOnboardingCompleteState] = useState(false);
+  const [momNameState, setMomNameState] = useState<string | null>(null);
+  const [partnerNameState, setPartnerNameState] = useState<string | null>(null);
 
-  // 2. Sync fetched data to component state
   useEffect(() => {
     if (profile) {
-      // FIX: Use parseLocalDate to avoid timezone shift when loading from DB
       setDueDateState(profile.due_date ? parseLocalDate(profile.due_date) : null);
       setBabyNameState(profile.baby_name ?? null);
       setBabySexState(profile.baby_sex ?? "unknown");
       setIsOnboardingCompleteState(profile.onboarding_complete ?? false);
+      setMomNameState(profile.mom_name ?? null);
+      setPartnerNameState(profile.partner_name ?? null);
     } else if (!isProfileFetching && user && !authLoading) {
-      // New user, profile not yet created/fetched
       setDueDateState(null);
       setBabyNameState(null);
       setBabySexState("unknown");
       setIsOnboardingCompleteState(false);
+      setMomNameState(null);
+      setPartnerNameState(null);
     }
   }, [profile, isProfileFetching, user, authLoading]);
 
   const today = useMemo(() => new Date(), []);
 
-  // 3. Setters persist to Supabase
-
   const setDueDate = useCallback(
     async (date: Date | null) => {
-      // Update local state immediately for responsive UI
       setDueDateState(date);
-
-      if (!user) {
-        console.error("Cannot save due date: no user logged in");
-        return;
-      }
+      if (!user) return;
 
       try {
         const { error } = await supabase
           .from("pregnancy_profiles")
-          .update({
-            due_date: date ? format(date, "yyyy-MM-dd") : null,
-          })
+          .update({ due_date: date ? format(date, "yyyy-MM-dd") : null })
           .eq("user_id", user.id);
 
         if (error) {
           console.error("Failed to save due date:", error);
-          // Revert local state on error
           refetch();
         } else {
-          // Invalidate cache so other components get fresh data
-          queryClient.invalidateQueries({
-            queryKey: ["pregnancyProfile", user.id],
-          });
+          queryClient.invalidateQueries({ queryKey: ["pregnancyProfile", user.id] });
         }
       } catch (err) {
         console.error("Failed to save due date:", err);
@@ -136,31 +128,20 @@ export function usePregnancyState(): PregnancyState {
 
   const setBabyName = useCallback(
     async (name: string | null) => {
-      // Update local state immediately for responsive UI
       setBabyNameState(name);
-
-      if (!user) {
-        console.error("Cannot save baby name: no user logged in");
-        return;
-      }
+      if (!user) return;
 
       try {
         const { error } = await supabase
           .from("pregnancy_profiles")
-          .update({
-            baby_name: name,
-          })
+          .update({ baby_name: name })
           .eq("user_id", user.id);
 
         if (error) {
           console.error("Failed to save baby name:", error);
-          // Revert local state on error
           refetch();
         } else {
-          // Invalidate cache so other components get fresh data
-          queryClient.invalidateQueries({
-            queryKey: ["pregnancyProfile", user.id],
-          });
+          queryClient.invalidateQueries({ queryKey: ["pregnancyProfile", user.id] });
         }
       } catch (err) {
         console.error("Failed to save baby name:", err);
@@ -172,31 +153,20 @@ export function usePregnancyState(): PregnancyState {
 
   const setBabySex = useCallback(
     async (sex: BabySex) => {
-      // Update local state immediately for responsive UI
       setBabySexState(sex);
-
-      if (!user) {
-        console.error("Cannot save baby sex: no user logged in");
-        return;
-      }
+      if (!user) return;
 
       try {
         const { error } = await supabase
           .from("pregnancy_profiles")
-          .update({
-            baby_sex: sex,
-          })
+          .update({ baby_sex: sex })
           .eq("user_id", user.id);
 
         if (error) {
           console.error("Failed to save baby sex:", error);
-          // Revert local state on error
           refetch();
         } else {
-          // Invalidate cache so other components get fresh data
-          queryClient.invalidateQueries({
-            queryKey: ["pregnancyProfile", user.id],
-          });
+          queryClient.invalidateQueries({ queryKey: ["pregnancyProfile", user.id] });
         }
       } catch (err) {
         console.error("Failed to save baby sex:", err);
@@ -206,7 +176,56 @@ export function usePregnancyState(): PregnancyState {
     [user, refetch, queryClient]
   );
 
-  // 4. Pregnancy metrics calculation
+  const setMomName = useCallback(
+    async (name: string | null) => {
+      setMomNameState(name);
+      if (!user) return;
+
+      try {
+        const { error } = await supabase
+          .from("pregnancy_profiles")
+          .update({ mom_name: name })
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.error("Failed to save mom name:", error);
+          refetch();
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["pregnancyProfile", user.id] });
+        }
+      } catch (err) {
+        console.error("Failed to save mom name:", err);
+        refetch();
+      }
+    },
+    [user, refetch, queryClient]
+  );
+
+  const setPartnerName = useCallback(
+    async (name: string | null) => {
+      setPartnerNameState(name);
+      if (!user) return;
+
+      try {
+        const { error } = await supabase
+          .from("pregnancy_profiles")
+          .update({ partner_name: name })
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.error("Failed to save partner name:", error);
+          refetch();
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["pregnancyProfile", user.id] });
+        }
+      } catch (err) {
+        console.error("Failed to save partner name:", err);
+        refetch();
+      }
+    },
+    [user, refetch, queryClient]
+  );
+
   const pregnancyMetrics = useMemo(() => {
     if (!dueDate) {
       return {
@@ -219,7 +238,6 @@ export function usePregnancyState(): PregnancyState {
 
     const weeksUntilDue = differenceInWeeks(dueDate, today);
     const rawWeek = TOTAL_PREGNANCY_WEEKS - weeksUntilDue;
-
     const currentWeek = Math.max(0, Math.min(42, rawWeek));
     const daysRemaining = Math.max(0, differenceInDays(dueDate, today));
 
@@ -230,20 +248,11 @@ export function usePregnancyState(): PregnancyState {
       trimester = 2;
     }
 
-    const progress = Math.min(
-      100,
-      Math.max(0, (currentWeek / TOTAL_PREGNANCY_WEEKS) * 100)
-    );
+    const progress = Math.min(100, Math.max(0, (currentWeek / TOTAL_PREGNANCY_WEEKS) * 100));
 
-    return {
-      currentWeek,
-      daysRemaining,
-      trimester,
-      progress,
-    };
+    return { currentWeek, daysRemaining, trimester, progress };
   }, [dueDate, today]);
 
-  // Total loading state combines auth and profile fetching
   const isProfileLoading = authLoading || isProfileFetching;
 
   return {
@@ -255,6 +264,10 @@ export function usePregnancyState(): PregnancyState {
     setBabyName,
     babySex: babySexState,
     setBabySex,
+    momName: momNameState,
+    setMomName,
+    partnerName: partnerNameState,
+    setPartnerName,
     isProfileLoading,
     isOnboardingComplete: isOnboardingCompleteState,
     setIsOnboardingComplete: setIsOnboardingCompleteState,
