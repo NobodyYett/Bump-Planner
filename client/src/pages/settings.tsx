@@ -17,6 +17,8 @@ import {
   isNotificationsSupported,
   isNightReminderEnabled,
   toggleNightReminder,
+  isMorningGuidanceEnabled,
+  toggleMorningGuidance,
   hasNotificationPermission,
   requestNotificationPermission,
 } from "@/lib/notifications";
@@ -52,10 +54,12 @@ export default function SettingsPage() {
   const [confirmText, setConfirmText] = useState("");
 
   // Notification state
-  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [nightReminderEnabled, setNightReminderEnabled] = useState(false);
+  const [morningGuidanceEnabled, setMorningGuidanceEnabled] = useState(false);
   const [notificationsAvailable, setNotificationsAvailable] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState(false);
-  const [togglingReminder, setTogglingReminder] = useState(false);
+  const [togglingNight, setTogglingNight] = useState(false);
+  const [togglingMorning, setTogglingMorning] = useState(false);
 
   const email = user?.email ?? "Unknown";
 
@@ -66,7 +70,8 @@ export default function SettingsPage() {
       if (supported) {
         const hasPermission = await hasNotificationPermission();
         setPermissionGranted(hasPermission);
-        setReminderEnabled(isNightReminderEnabled());
+        setNightReminderEnabled(isNightReminderEnabled());
+        setMorningGuidanceEnabled(isMorningGuidanceEnabled());
       }
     }
     checkNotifications();
@@ -80,8 +85,8 @@ export default function SettingsPage() {
     setPartnerInput(partnerName ?? "");
   }, [babyName, dueDate, babySex, momName, partnerName]);
 
-  async function handleReminderToggle(enabled: boolean) {
-    setTogglingReminder(true);
+  async function handleNightReminderToggle(enabled: boolean) {
+    setTogglingNight(true);
     try {
       if (enabled && !permissionGranted) {
         const granted = await requestNotificationPermission();
@@ -92,24 +97,57 @@ export default function SettingsPage() {
             description: "Please enable notifications in your device settings.",
             variant: "destructive",
           });
-          setTogglingReminder(false);
+          setTogglingNight(false);
           return;
         }
       }
       const success = await toggleNightReminder(enabled);
       if (success) {
-        setReminderEnabled(enabled);
+        setNightReminderEnabled(enabled);
         toast({
-          title: enabled ? "Reminder enabled" : "Reminder disabled",
+          title: enabled ? "Evening reminder enabled" : "Evening reminder disabled",
           description: enabled
             ? "You'll receive a gentle reminder at 8:30pm each evening."
             : "Evening reminders have been turned off.",
         });
       }
     } catch (error) {
-      console.error("Failed to toggle reminder:", error);
+      console.error("Failed to toggle night reminder:", error);
     } finally {
-      setTogglingReminder(false);
+      setTogglingNight(false);
+    }
+  }
+
+  async function handleMorningGuidanceToggle(enabled: boolean) {
+    setTogglingMorning(true);
+    try {
+      if (enabled && !permissionGranted) {
+        const granted = await requestNotificationPermission();
+        setPermissionGranted(granted);
+        if (!granted) {
+          toast({
+            title: "Notifications disabled",
+            description: "Please enable notifications in your device settings.",
+            variant: "destructive",
+          });
+          setTogglingMorning(false);
+          return;
+        }
+      }
+      const success = await toggleMorningGuidance(enabled);
+      if (success) {
+        setMorningGuidanceEnabled(enabled);
+        toast({
+          title: enabled ? "Morning guidance enabled" : "Morning guidance disabled",
+          description: enabled
+            ? "You'll receive a gentle morning message at 8:30am."
+            : "Morning guidance has been turned off.",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to toggle morning guidance:", error);
+    } finally {
+      setTogglingMorning(false);
     }
   }
 
@@ -220,23 +258,40 @@ export default function SettingsPage() {
             </h2>
             <p className="text-sm text-muted-foreground">Manage your reminder preferences.</p>
           </div>
-          <div className="p-6">
+          <div className="p-6 space-y-6">
+            {/* Morning Guidance */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Morning guidance</label>
+                <p className="text-xs text-muted-foreground">
+                  {notificationsAvailable ? "A gentle message at 8:30am to start your day" : "Available on iOS and Android apps"}
+                </p>
+              </div>
+              <Switch
+                checked={morningGuidanceEnabled}
+                onCheckedChange={handleMorningGuidanceToggle}
+                disabled={!notificationsAvailable || togglingMorning}
+              />
+            </div>
+
+            {/* Evening Reminder */}
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <label className="text-sm font-medium">Evening check-in reminder</label>
                 <p className="text-xs text-muted-foreground">
-                  {notificationsAvailable ? "Receive a gentle reminder at 8:30pm" : "Available on iOS and Android apps"}
+                  {notificationsAvailable ? "A gentle reminder at 8:30pm to check in" : "Available on iOS and Android apps"}
                 </p>
               </div>
               <Switch
-                checked={reminderEnabled}
-                onCheckedChange={handleReminderToggle}
-                disabled={!notificationsAvailable || togglingReminder}
+                checked={nightReminderEnabled}
+                onCheckedChange={handleNightReminderToggle}
+                disabled={!notificationsAvailable || togglingNight}
               />
             </div>
+
             {!permissionGranted && notificationsAvailable && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">
-                Notification permission not granted. Enable the toggle to request permission.
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Notification permission not granted. Enable a toggle above to request permission.
               </p>
             )}
           </div>

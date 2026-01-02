@@ -4,22 +4,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { type CheckinSlot, getSuggestedSlot } from "@/lib/checkinSlots";
+import { subDays, format } from "date-fns";
 
 // ---- helpers ----
 
 type Mood = "happy" | "neutral" | "sad";
+type Energy = "high" | "medium" | "low";
 
 type CreateLogInput = {
   date: string; // "yyyy-MM-dd"
   week: number;
   mood: Mood;
-  slot?: CheckinSlot; // New: optional slot (morning/evening/night)
+  slot?: CheckinSlot;
+  energy?: Energy;
   symptoms?: string;
   notes?: string;
 };
 
 // Normalize Supabase column names to match UI expectations.
-// Supabase returns `created_at`, while some UI code expects `createdAt`.
 function normalizeLogRow<T extends Record<string, any>>(row: T): T & { createdAt?: string } {
   if (!row) return row as any;
 
@@ -35,9 +37,9 @@ export function getTimeOfDaySlot(
   d: Date = new Date(),
 ): "morning" | "afternoon" | "evening" {
   const hour = d.getHours();
-  if (hour < 12) return "morning"; // before noon
-  if (hour < 18) return "afternoon"; // 12:00–17:59
-  return "evening"; // 18:00+
+  if (hour < 12) return "morning";
+  if (hour < 18) return "afternoon";
+  return "evening";
 }
 
 // ---- queries ----
@@ -88,7 +90,38 @@ export function useTodayLogs(date: string) {
   });
 }
 
-// Backwards-compat wrapper (in case anything else still imports it)
+// Logs for last 7 days (used by Weekly Summary)
+export function useWeekLogs() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["pregnancyLogs", "week", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      if (!user) return [];
+
+      const today = new Date();
+      const sevenDaysAgo = subDays(today, 6); // Include today = 7 days total
+      const startDate = format(sevenDaysAgo, "yyyy-MM-dd");
+      const endDate = format(today, "yyyy-MM-dd");
+
+      const { data, error } = await supabase
+        .from("pregnancy_logs")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("date", startDate)
+        .lte("date", endDate)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return (data ?? []).map(normalizeLogRow);
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+// Backwards-compat wrapper
 export function useTodayLog(date: string) {
   const result = useTodayLogs(date);
   return {
@@ -109,7 +142,6 @@ export function useCreatePregnancyLog() {
         throw new Error("Not authenticated");
       }
 
-      // Use provided slot or fall back to suggested slot based on time
       const slot = input.slot ?? getSuggestedSlot();
 
       const { data, error } = await supabase
@@ -119,10 +151,11 @@ export function useCreatePregnancyLog() {
           date: input.date,
           week: input.week,
           mood: input.mood,
+          energy: input.energy ?? null,
           symptoms: input.symptoms ?? null,
           notes: input.notes ?? null,
-          slot: slot, // New field
-          time_of_day: slot, // Keep for backwards compat with existing column
+          slot: slot,
+          time_of_day: slot,
         })
         .select("*")
         .single();
@@ -131,10 +164,12 @@ export function useCreatePregnancyLog() {
       return normalizeLogRow(data as any);
     },
     onSuccess: (_data, vars) => {
-      // refresh overall list + today's list
       queryClient.invalidateQueries({ queryKey: ["pregnancyLogs"] });
       queryClient.invalidateQueries({
         queryKey: ["pregnancyLogs", "today", user?.id, vars.date],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["pregnancyLogs", "week", user?.id],
       });
     },
   });

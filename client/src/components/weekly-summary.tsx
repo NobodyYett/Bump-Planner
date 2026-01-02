@@ -1,0 +1,318 @@
+// client/src/components/weekly-summary.tsx
+
+import { useMemo, useState, useEffect } from "react";
+import { useWeekLogs } from "@/hooks/usePregnancyLogs";
+import { BarChart3, Smile, Meh, Frown, Zap, Sun, Sunset, Moon, TrendingUp, Sparkles, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { getNudgeForCheckin, isNudgeCompleted, markNudgeCompleted, type CheckinContext } from "@/lib/nudges";
+import { Checkbox } from "@/components/ui/checkbox";
+
+interface WeeklySummaryProps {
+  isPaid?: boolean;
+  checkinContext?: CheckinContext | null;
+}
+
+type Mood = "happy" | "neutral" | "sad";
+type Energy = "high" | "medium" | "low";
+type Slot = "morning" | "evening" | "night";
+
+interface WeekStats {
+  totalCheckins: number;
+  moodCounts: Record<Mood, number>;
+  dominantMood: Mood | null;
+  symptomCounts: Record<string, number>;
+  topSymptoms: string[];
+  slotCounts: Record<Slot, number>;
+  challengingSlot: Slot | null;
+  energyCounts: Record<Energy, number>;
+  hasEnergyData: boolean;
+  dominantEnergy: Energy | null;
+}
+
+function analyzeWeekLogs(logs: any[]): WeekStats {
+  const moodCounts: Record<Mood, number> = { happy: 0, neutral: 0, sad: 0 };
+  const symptomCounts: Record<string, number> = {};
+  const slotCounts: Record<Slot, number> = { morning: 0, evening: 0, night: 0 };
+  const energyCounts: Record<Energy, number> = { high: 0, medium: 0, low: 0 };
+  
+  let hasEnergyData = false;
+
+  for (const log of logs) {
+    if (log.mood && moodCounts.hasOwnProperty(log.mood)) {
+      moodCounts[log.mood as Mood]++;
+    }
+
+    if (log.symptoms) {
+      const symptoms = String(log.symptoms).split(",").map((s: string) => s.trim().toLowerCase());
+      for (const symptom of symptoms) {
+        if (symptom) {
+          symptomCounts[symptom] = (symptomCounts[symptom] || 0) + 1;
+        }
+      }
+    }
+
+    const slot = log.slot || log.time_of_day;
+    if (slot && slotCounts.hasOwnProperty(slot)) {
+      slotCounts[slot as Slot]++;
+    }
+
+    if (log.energy && energyCounts.hasOwnProperty(log.energy)) {
+      energyCounts[log.energy as Energy]++;
+      hasEnergyData = true;
+    }
+  }
+
+  let dominantMood: Mood | null = null;
+  let maxMoodCount = 0;
+  for (const [mood, count] of Object.entries(moodCounts)) {
+    if (count > maxMoodCount) {
+      maxMoodCount = count;
+      dominantMood = mood as Mood;
+    }
+  }
+
+  const topSymptoms = Object.entries(symptomCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([symptom]) => symptom.charAt(0).toUpperCase() + symptom.slice(1));
+
+  let challengingSlot: Slot | null = null;
+  const slotSadNeutral: Record<Slot, number> = { morning: 0, evening: 0, night: 0 };
+  for (const log of logs) {
+    const slot = log.slot || log.time_of_day;
+    if (slot && (log.mood === "sad" || log.mood === "neutral")) {
+      slotSadNeutral[slot as Slot]++;
+    }
+  }
+  let maxChallenging = 0;
+  for (const [slot, count] of Object.entries(slotSadNeutral)) {
+    if (count > maxChallenging && slotCounts[slot as Slot] > 0) {
+      maxChallenging = count;
+      challengingSlot = slot as Slot;
+    }
+  }
+
+  let dominantEnergy: Energy | null = null;
+  let maxEnergyCount = 0;
+  for (const [energy, count] of Object.entries(energyCounts)) {
+    if (count > maxEnergyCount) {
+      maxEnergyCount = count;
+      dominantEnergy = energy as Energy;
+    }
+  }
+
+  return {
+    totalCheckins: logs.length,
+    moodCounts,
+    dominantMood,
+    symptomCounts,
+    topSymptoms,
+    slotCounts,
+    challengingSlot,
+    energyCounts,
+    hasEnergyData,
+    dominantEnergy,
+  };
+}
+
+function getMoodLabel(mood: Mood): string {
+  return mood === "happy" ? "great" : mood === "neutral" ? "okay" : "not great";
+}
+
+function getEnergyLabel(energy: Energy): string {
+  return energy === "high" ? "high energy" : energy === "medium" ? "moderate energy" : "lower energy";
+}
+
+const slotIcons: Record<Slot, React.ReactNode> = {
+  morning: <Sun className="w-4 h-4" />,
+  evening: <Sunset className="w-4 h-4" />,
+  night: <Moon className="w-4 h-4" />,
+};
+
+const moodIcons: Record<Mood, React.ReactNode> = {
+  happy: <Smile className="w-4 h-4 text-green-600 dark:text-green-400" />,
+  neutral: <Meh className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />,
+  sad: <Frown className="w-4 h-4 text-red-600 dark:text-red-400" />,
+};
+
+export function WeeklySummary({ isPaid = false, checkinContext = null }: WeeklySummaryProps) {
+  const { data: weekLogs = [], isLoading } = useWeekLogs();
+  const stats = useMemo(() => analyzeWeekLogs(weekLogs), [weekLogs]);
+
+  // Nudge state
+  const [nudgeCompleted, setNudgeCompleted] = useState(false);
+  const nudge = getNudgeForCheckin(checkinContext);
+
+  useEffect(() => {
+    setNudgeCompleted(isNudgeCompleted());
+  }, []);
+
+  function handleNudgeToggle(checked: boolean) {
+    if (checked) {
+      markNudgeCompleted();
+      setNudgeCompleted(true);
+    }
+  }
+
+  // Build summary text
+  const summaryParts: string[] = [];
+  if (stats.dominantMood) {
+    const moodText = getMoodLabel(stats.dominantMood);
+    summaryParts.push(`You've been feeling mostly ${moodText} this week`);
+  }
+  if (stats.topSymptoms.length > 0) {
+    const symptomsText = stats.topSymptoms.join(", ").toLowerCase();
+    summaryParts.push(`with ${symptomsText} showing up most often`);
+  }
+  if (stats.challengingSlot && isPaid) {
+    const slotLabel = stats.challengingSlot === "morning" ? "mornings" : stats.challengingSlot === "evening" ? "evenings" : "nights";
+    summaryParts.push(`${slotLabel} tend to be tougher`);
+  }
+  if (stats.hasEnergyData && stats.dominantEnergy && isPaid) {
+    summaryParts.push(`Overall ${getEnergyLabel(stats.dominantEnergy)}`);
+  }
+
+  const freeRecap = summaryParts.slice(0, 2).join(", ") + ".";
+  
+  let paidSuggestion = "";
+  if (isPaid) {
+    if (stats.challengingSlot === "morning" && stats.dominantEnergy === "low") {
+      paidSuggestion = "Consider a gentler morning routine or going to bed earlier.";
+    } else if (stats.challengingSlot === "evening") {
+      paidSuggestion = "Evening rest breaks might help — even 10 minutes can make a difference.";
+    } else if (stats.challengingSlot === "night") {
+      paidSuggestion = "Nights can be tough. A wind-down routine before bed might help.";
+    } else if (stats.topSymptoms.map(s => s.toLowerCase()).includes("fatigue")) {
+      paidSuggestion = "Fatigue is common. Small, frequent meals and staying hydrated can help.";
+    } else {
+      paidSuggestion = "Keep listening to your body — you're doing great.";
+    }
+  }
+
+  const hasWeekData = !isLoading && stats.totalCheckins > 0;
+
+  return (
+    <section className="bg-card rounded-xl p-6 border border-border shadow-sm">
+      {/* Today's Gentle Nudge */}
+      <div className="flex items-start gap-3 mb-4">
+        <div className={cn(
+          "shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5",
+          nudgeCompleted 
+            ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" 
+            : "bg-primary/10 text-primary"
+        )}>
+          {nudgeCompleted ? <Check className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-medium text-muted-foreground mb-1">Today's gentle nudge</h3>
+          <div className="flex items-center gap-3">
+            <p className={cn(
+              "text-sm flex-1",
+              nudgeCompleted ? "text-muted-foreground line-through" : "text-foreground"
+            )}>
+              {nudgeCompleted ? "Nice. Small wins count." : nudge.message}
+            </p>
+            {!nudgeCompleted && (
+              <Checkbox 
+                checked={nudgeCompleted}
+                onCheckedChange={handleNudgeToggle}
+                className="shrink-0"
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Divider - only show if we have week data */}
+      {hasWeekData && (
+        <div className="border-t border-border my-4" />
+      )}
+
+      {/* Week at a Glance - only show if we have data */}
+      {hasWeekData && (
+        <>
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="font-medium text-sm">Your Week at a Glance</h2>
+              <p className="text-xs text-muted-foreground">{stats.totalCheckins} check-in{stats.totalCheckins !== 1 ? "s" : ""} over the last 7 days</p>
+            </div>
+          </div>
+
+          {/* Summary Text */}
+          <p className="text-sm text-foreground leading-relaxed mb-4">
+            {freeRecap}
+          </p>
+
+          {/* Visual Stats Row */}
+          <div className="flex gap-3 mb-4">
+            {/* Mood Distribution */}
+            <div className="flex-1 bg-muted/50 rounded-lg p-3">
+              <div className="text-xs text-muted-foreground mb-2">Mood</div>
+              <div className="flex items-center gap-2">
+                {(["happy", "neutral", "sad"] as Mood[]).map((mood) => (
+                  <div key={mood} className="flex items-center gap-1">
+                    {moodIcons[mood]}
+                    <span className="text-xs font-medium">{stats.moodCounts[mood]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top Symptom */}
+            {stats.topSymptoms.length > 0 && (
+              <div className="flex-1 bg-muted/50 rounded-lg p-3">
+                <div className="text-xs text-muted-foreground mb-2">Top symptom</div>
+                <div className="text-sm font-medium truncate">{stats.topSymptoms[0]}</div>
+              </div>
+            )}
+
+            {/* Energy (if data exists) */}
+            {stats.hasEnergyData && stats.dominantEnergy && (
+              <div className="flex-1 bg-muted/50 rounded-lg p-3">
+                <div className="text-xs text-muted-foreground mb-2">Energy</div>
+                <div className="flex items-center gap-1">
+                  <Zap className={cn(
+                    "w-4 h-4",
+                    stats.dominantEnergy === "high" ? "text-amber-500" :
+                    stats.dominantEnergy === "medium" ? "text-amber-400" : "text-amber-300"
+                  )} />
+                  <span className="text-sm font-medium capitalize">{stats.dominantEnergy}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Challenging Time (Paid only) */}
+          {isPaid && stats.challengingSlot && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4 bg-muted/30 rounded-lg px-3 py-2">
+              {slotIcons[stats.challengingSlot]}
+              <span>
+                {stats.challengingSlot.charAt(0).toUpperCase() + stats.challengingSlot.slice(1)}s tend to be your tougher time
+              </span>
+            </div>
+          )}
+
+          {/* Paid Suggestion */}
+          {isPaid && paidSuggestion && (
+            <div className="flex items-start gap-2 text-sm bg-primary/5 border border-primary/10 rounded-lg px-3 py-2">
+              <TrendingUp className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <p className="text-foreground">{paidSuggestion}</p>
+            </div>
+          )}
+
+          {/* Free Upgrade Hint */}
+          {!isPaid && stats.totalCheckins >= 3 && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Upgrade to Premium for deeper insights and personalized suggestions.
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

@@ -5,7 +5,7 @@ import { Layout } from "@/components/layout";
 import { WeekProgress } from "@/components/week-progress";
 import { BabySizeDisplay } from "@/components/baby-size-display";
 import { DailyCheckIn } from "@/components/daily-checkin";
-import { GentleNudge } from "@/components/gentle-nudge";
+import { WeeklySummary } from "@/components/weekly-summary";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
 import { WeeklyWisdom } from "@/components/weekly-wisdom";
 import { Registries } from "@/components/registries";
@@ -44,6 +44,9 @@ export default function Home() {
   const [nextAppt, setNextAppt] = useState<NextAppt | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState(babyName ?? "");
+
+  // TODO: Replace with actual subscription check
+  const isPaid = false;
 
   // Get today's check-ins for nudge + AI context
   const todayDate = format(new Date(), "yyyy-MM-dd");
@@ -222,8 +225,8 @@ export default function Home() {
           <div className="md:col-span-2 space-y-8">
             <BabySizeDisplay currentWeek={currentWeek} />
 
-            {/* Gentle Nudge */}
-            <GentleNudge checkinContext={checkinContext} />
+            {/* Weekly Summary (includes Today's Gentle Nudge) */}
+            <WeeklySummary isPaid={isPaid} checkinContext={checkinContext} />
 
             <div className="bg-card rounded-xl p-6 border border-border shadow-sm space-y-4">
               <WeekProgress currentWeek={currentWeek} />

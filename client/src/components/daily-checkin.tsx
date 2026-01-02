@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Smile, Frown, Meh, Loader2, Sun, Sunset, Moon } from "lucide-react";
+import { Smile, Frown, Meh, Loader2, Sun, Sunset, Moon, Zap, Battery, BatteryLow } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useCreatePregnancyLog, useTodayLogs } from "@/hooks/usePregnancyLogs";
@@ -18,6 +18,8 @@ import {
 interface DailyCheckInProps {
   currentWeek: number;
 }
+
+type Energy = "high" | "medium" | "low";
 
 // Common symptom chips for quick selection
 const SYMPTOM_CHIPS = [
@@ -39,6 +41,12 @@ const slotIcons: Record<CheckinSlot, React.ReactNode> = {
   night: <Moon className="w-3.5 h-3.5 shrink-0" />,
 };
 
+const energyConfig: Record<Energy, { icon: React.ReactNode; label: string }> = {
+  high: { icon: <Zap className="w-4 h-4" />, label: "High" },
+  medium: { icon: <Battery className="w-4 h-4" />, label: "Medium" },
+  low: { icon: <BatteryLow className="w-4 h-4" />, label: "Low" },
+};
+
 export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
   const { toast } = useToast();
   const todayDate = format(new Date(), "yyyy-MM-dd");
@@ -51,6 +59,7 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
   // Form state
   const [selectedSlot, setSelectedSlot] = useState<CheckinSlot>(() => getSuggestedSlot());
   const [selectedMood, setSelectedMood] = useState<"happy" | "neutral" | "sad" | null>(null);
+  const [selectedEnergy, setSelectedEnergy] = useState<Energy | null>(null);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
@@ -88,6 +97,7 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
         week: currentWeek,
         mood: selectedMood,
         slot: selectedSlot,
+        energy: selectedEnergy ?? undefined,
         symptoms: selectedSymptoms.length > 0 ? selectedSymptoms.join(", ") : undefined,
         notes: notes.trim() ? notes.trim() : undefined,
       });
@@ -99,6 +109,7 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
 
       // Reset form
       setSelectedMood(null);
+      setSelectedEnergy(null);
       setSelectedSymptoms([]);
       setNotes("");
     } catch (error) {
@@ -175,6 +186,11 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
   const slotBtnActive = "border-primary bg-primary/10 text-primary font-medium";
   const slotBtnCompleted = "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400";
 
+  const energyBtnBase =
+    "flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-lg border transition-all min-w-0";
+  const energyBtnInactive = "border-border hover:bg-muted text-muted-foreground";
+  const energyBtnActive = "border-amber-400 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400";
+
   return (
     <div className={cardClass}>
       {/* Header */}
@@ -187,7 +203,7 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
         </p>
       </div>
 
-      {/* Slot Selector - constrained width */}
+      {/* Slot Selector */}
       <div className="mt-4 flex gap-1.5 w-full">
         {ALL_SLOTS.map((slot) => {
           const isCompleted = completedSlots.has(slot);
@@ -255,6 +271,29 @@ export function DailyCheckIn({ currentWeek }: DailyCheckInProps) {
           <Frown className="w-5 h-5" />
           <span className="text-xs font-medium">Not good</span>
         </button>
+      </div>
+
+      {/* Energy buttons */}
+      <div className="mt-4 space-y-2">
+        <div className="text-xs font-medium">Energy (optional)</div>
+        <div className="flex gap-2 w-full">
+          {(["high", "medium", "low"] as Energy[]).map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() =>
+                setSelectedEnergy((prev) => (prev === level ? null : level))
+              }
+              className={cn(
+                energyBtnBase,
+                selectedEnergy === level ? energyBtnActive : energyBtnInactive,
+              )}
+            >
+              {energyConfig[level].icon}
+              <span className="text-xs font-medium">{energyConfig[level].label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Symptom Chips */}
