@@ -1,4 +1,9 @@
 // client/src/components/registries.tsx
+//
+// Baby Registry Card
+// - Facilitates creating/linking registries on external platforms
+// - Does NOT recommend, display, or sell products
+// - Partner access is read-only
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import {
   AlertDialog,
@@ -20,33 +26,144 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, ExternalLink, Trash2, Gift } from "lucide-react";
+import { 
+  ExternalLink, 
+  Trash2, 
+  Gift, 
+  Link2,
+  ChevronRight,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { usePartnerAccess } from "@/contexts/PartnerContext";
+import {
+  getEnabledPlatforms,
+  openExternalLink,
+  detectPlatformFromUrl,
+  getPlatformDisplayName,
+  type RegistryPlatform,
+} from "@/config/registryLinks";
+
+// ============================================
+// Types
+// ============================================
 
 type Registry = {
   id: string;
-  name: string;
-  url: string;
+  registry_platform: string;
+  registry_url: string;
 };
 
 interface RegistriesProps {
   isReadOnly?: boolean;
 }
 
+// ============================================
+// Helpers
+// ============================================
+
 function isValidUrl(url: string): boolean {
   return url.startsWith("http://") || url.startsWith("https://");
 }
 
-function getDomainFromUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname.replace("www.", "");
-  } catch {
-    return url;
-  }
+// ============================================
+// Platform Tile Component
+// ============================================
+
+interface PlatformTileProps {
+  platform: RegistryPlatform;
+  disabled?: boolean;
 }
+
+function PlatformTile({ platform, disabled = false }: PlatformTileProps) {
+  const isConfigured = platform.url !== null;
+
+  function handleClick() {
+    if (isConfigured && platform.url) {
+      openExternalLink(platform.url);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled || !isConfigured}
+      className="flex items-center gap-3 w-full p-4 rounded-lg border border-border bg-background hover:bg-muted/50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed group"
+    >
+      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+        <Gift className="w-5 h-5 text-muted-foreground" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground">
+          {platform.name}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {isConfigured ? platform.description : "Link not configured"}
+        </p>
+      </div>
+      {isConfigured && (
+        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+      )}
+    </button>
+  );
+}
+
+// ============================================
+// Saved Registry Row Component
+// ============================================
+
+interface SavedRegistryRowProps {
+  registry: Registry;
+  canEdit: boolean;
+  onDelete: (id: string) => void;
+}
+
+function SavedRegistryRow({ registry, canEdit, onDelete }: SavedRegistryRowProps) {
+  const displayName = getPlatformDisplayName(registry.registry_platform);
+
+  function handleOpen() {
+    openExternalLink(registry.registry_url);
+  }
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 group">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground">
+          {displayName}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">
+          Registry link saved
+        </p>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleOpen}
+        className="gap-1.5 text-muted-foreground hover:text-foreground"
+      >
+        Open
+        <ExternalLink className="w-3.5 h-3.5" />
+      </Button>
+
+      {canEdit && (
+        <button
+          type="button"
+          onClick={() => onDelete(registry.id)}
+          className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+          title="Remove registry"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Main Component
+// ============================================
 
 export function Registries({ isReadOnly = false }: RegistriesProps) {
   const { user } = useAuth();
@@ -54,18 +171,27 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
   
   const [registries, setRegistries] = useState<Registry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isLinkSheetOpen, setIsLinkSheetOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // Link form state
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Determine which user's registries to fetch
   const targetUserId = isPartnerView ? momUserId : user?.id;
+  
+  // Determine if actions should be disabled (partner = read-only)
+  const canEdit = !isReadOnly && !isPartnerView;
 
-  // Fetch registries from Supabase
+  // Get enabled platforms from config
+  const platforms = getEnabledPlatforms();
+
+  // ============================================
+  // Data Fetching
+  // ============================================
+
   useEffect(() => {
     async function loadRegistries() {
       if (!targetUserId) {
@@ -78,7 +204,7 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
 
       const { data, error: fetchError } = await supabase
         .from("registries")
-        .select("id, name, url")
+        .select("id, registry_platform, registry_url")
         .eq("user_id", targetUserId)
         .order("created_at", { ascending: true });
 
@@ -95,25 +221,30 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
     loadRegistries();
   }, [targetUserId]);
 
-  async function handleAdd() {
+  // ============================================
+  // Actions
+  // ============================================
+
+  // Link an existing registry
+  async function handleLinkRegistry() {
     if (!user || isPartnerView) return;
     
-    setError(null);
+    setLinkError(null);
 
-    if (!name.trim()) {
-      setError("Please enter a name for your registry.");
+    const trimmedUrl = linkUrl.trim();
+
+    if (!trimmedUrl) {
+      setLinkError("Please enter your registry URL.");
       return;
     }
 
-    if (!url.trim()) {
-      setError("Please enter a URL.");
+    if (!isValidUrl(trimmedUrl)) {
+      setLinkError("URL must start with http:// or https://");
       return;
     }
 
-    if (!isValidUrl(url)) {
-      setError("URL must start with http:// or https://");
-      return;
-    }
+    // Auto-detect platform from URL
+    const platform = detectPlatformFromUrl(trimmedUrl);
 
     setIsSaving(true);
 
@@ -121,26 +252,26 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
       .from("registries")
       .insert({
         user_id: user.id,
-        name: name.trim(),
-        url: url.trim(),
+        registry_platform: platform,
+        registry_url: trimmedUrl,
       })
-      .select("id, name, url")
+      .select("id, registry_platform, registry_url")
       .single();
 
     setIsSaving(false);
 
     if (insertError) {
       console.error("Failed to add registry:", insertError);
-      setError("Failed to add registry. Please try again.");
+      setLinkError("Failed to add registry. Please try again.");
       return;
     }
 
     setRegistries((prev) => [...prev, data]);
-    setName("");
-    setUrl("");
-    setIsAddOpen(false);
+    setLinkUrl("");
+    setIsLinkSheetOpen(false);
   }
 
+  // Delete a registry
   async function handleDelete() {
     if (!deleteId || !user || isPartnerView) return;
 
@@ -159,144 +290,157 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
     setDeleteId(null);
   }
 
-  function openLink(registryUrl: string) {
-    window.open(registryUrl, "_blank", "noopener,noreferrer");
-  }
-
-  // Determine if actions should be disabled
-  const actionsDisabled = isReadOnly || isPartnerView;
+  // ============================================
+  // Render
+  // ============================================
 
   return (
-    <section className="bg-card rounded-3xl border border-border shadow-sm px-6 py-6 md:px-10 md:py-8">
-      <div className="flex items-center justify-between gap-3 mb-4">
+    <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-5 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Gift className="w-5 h-5 text-primary" />
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+            <Gift className="w-5 h-5 text-muted-foreground" />
           </div>
           <div>
-            <h2 className="font-serif text-xl md:text-2xl font-semibold">
-              Registries
+            <h2 className="font-serif text-xl font-semibold text-foreground">
+              Baby Registry
             </h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {actionsDisabled 
-                ? "View baby registry links"
-                : "Keep your baby registries in one place."
-              }
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Create or link your baby registry on a trusted platform and manage access in one place.
             </p>
           </div>
         </div>
+      </div>
 
-        {/* Add button - hidden for read-only/partner */}
-        {!actionsDisabled && (
-          <Sheet open={isAddOpen} onOpenChange={setIsAddOpen}>
-            <SheetTrigger asChild>
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <Plus className="w-4 h-4" />
-                Add
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl">
-              <SheetHeader className="text-left pb-4">
-                <SheetTitle>Add Registry</SheetTitle>
-              </SheetHeader>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Registry Name</label>
-                  <Input
-                    placeholder="e.g., Amazon, Target, Babylist"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+      {/* Content */}
+      <div className="p-6">
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">Loading...</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Saved Registries */}
+            {registries.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                  Your Registries
+                </p>
+                {registries.map((registry) => (
+                  <SavedRegistryRow
+                    key={registry.id}
+                    registry={registry}
+                    canEdit={canEdit}
+                    onDelete={setDeleteId}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">URL</label>
-                  <Input
-                    placeholder="https://..."
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    type="url"
-                  />
-                </div>
-
-                {error && (
-                  <p className="text-sm text-destructive">{error}</p>
-                )}
-
-                <Button onClick={handleAdd} className="w-full" disabled={isSaving}>
-                  {isSaving ? "Adding..." : "Add Registry"}
-                </Button>
+                ))}
               </div>
-            </SheetContent>
-          </Sheet>
+            )}
+
+            {/* Empty State for Saved Registries */}
+            {registries.length === 0 && (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">
+                  No registry added yet.
+                </p>
+              </div>
+            )}
+
+            {/* Platform Tiles - Only for Mom */}
+            {canEdit && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Continue on a trusted registry platform.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {platforms.map((platform) => (
+                    <PlatformTile
+                      key={platform.id}
+                      platform={platform}
+                    />
+                  ))}
+                </div>
+
+                {/* Link Existing Registry */}
+                <Sheet open={isLinkSheetOpen} onOpenChange={setIsLinkSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="w-full gap-2 text-muted-foreground mt-2"
+                    >
+                      <Link2 className="w-4 h-4" />
+                      Link an existing registry
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="rounded-t-2xl">
+                    <SheetHeader className="text-left pb-4">
+                      <SheetTitle>Link Existing Registry</SheetTitle>
+                      <SheetDescription>
+                        Paste the URL of your existing registry from any platform.
+                      </SheetDescription>
+                    </SheetHeader>
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Registry URL</label>
+                        <Input
+                          placeholder="https://www.babylist.com/your-registry"
+                          value={linkUrl}
+                          onChange={(e) => setLinkUrl(e.target.value)}
+                          type="url"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          The platform will be detected automatically from your URL.
+                        </p>
+                      </div>
+
+                      {linkError && (
+                        <p className="text-sm text-destructive">{linkError}</p>
+                      )}
+
+                      <Button 
+                        onClick={handleLinkRegistry} 
+                        className="w-full" 
+                        disabled={isSaving}
+                      >
+                        {isSaving ? "Adding..." : "Add Registry"}
+                      </Button>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-6 text-muted-foreground">
-          <p className="text-sm">Loading registries...</p>
-        </div>
-      ) : registries.length === 0 ? (
-        <div className="text-center py-6 text-muted-foreground">
-          <p className="text-sm">No registries added yet.</p>
-          {!actionsDisabled && (
-            <p className="text-xs mt-1">Tap "Add" to save your first registry link.</p>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {registries.map((registry) => (
-            <div
-              key={registry.id}
-              className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50 group"
-            >
-              <button
-                type="button"
-                onClick={() => openLink(registry.url)}
-                className="flex-1 flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
-              >
-                <div className="w-8 h-8 rounded-lg bg-background border border-border flex items-center justify-center shrink-0">
-                  <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{registry.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {getDomainFromUrl(registry.url)}
-                  </p>
-                </div>
-              </button>
+      {/* Disclaimer */}
+      <div className="px-6 py-3 border-t border-border bg-muted/20">
+        <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+          Registries are created and managed by third-party platforms. Bump Planner does not sell products or provide shopping recommendations.
+        </p>
+      </div>
 
-              {/* Delete button - hidden for read-only/partner */}
-              {!actionsDisabled && (
-                <button
-                  type="button"
-                  onClick={() => setDeleteId(registry.id)}
-                  className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-                  title="Delete registry"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Delete dialog - only needed for non-read-only */}
-      {!actionsDisabled && (
+      {/* Delete Confirmation Dialog */}
+      {canEdit && (
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Registry?</AlertDialogTitle>
+              <AlertDialogTitle>Remove Registry?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will remove the registry link from your list. You can always add it again later.
+                This will remove the registry link from your list. 
+                Your actual registry on the platform is not affected.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Delete
+              <AlertDialogAction 
+                onClick={handleDelete} 
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Remove
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

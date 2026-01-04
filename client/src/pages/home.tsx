@@ -310,19 +310,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Shared Tasks - separate card for both views */}
-        {(() => {
-          const taskUserId = isPartnerView ? momUserId : user?.id;
-          if (!taskUserId) return null;
-          return (
-            <SharedTasksCard
-              momUserId={taskUserId}
-              trimester={trimester}
-              isPartnerView={isPartnerView}
-            />
-          );
-        })()}
-
         {/* Weekly Wisdom - only for mom */}
         {!isPartnerView && (
           <WeeklyWisdom 
@@ -334,6 +321,20 @@ export default function Home() {
 
         {/* Registries - visible to both, read-only for partner */}
         <Registries isReadOnly={isPartnerView} />
+
+        {/* Shared Tasks - separate card for both views (after registries) */}
+        {(() => {
+          const taskUserId = isPartnerView ? momUserId : user?.id;
+          if (!taskUserId) return null;
+          return (
+            <SharedTasksCard
+              momUserId={taskUserId}
+              trimester={trimester}
+              currentWeek={currentWeek}
+              isPartnerView={isPartnerView}
+            />
+          );
+        })()}
       </div>
     </Layout>
   );
