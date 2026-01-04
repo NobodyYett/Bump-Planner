@@ -286,6 +286,11 @@ export default function Home() {
                 isPartnerView={false}
               />
             )}
+
+            {/* Registry for Partner - in left column, same width as Current Progress */}
+            {isPartnerView && (
+              <Registries isReadOnly={true} />
+            )}
           </div>
 
           {/* Right column */}
@@ -297,19 +302,15 @@ export default function Home() {
             
             {/* "How She's Doing" card for partners */}
             {isPartnerView && (
-              <>
-                <WeeklySummary 
-                  isPaid={false} 
-                  checkinContext={null}
-                  isPartnerView={true}
-                  currentWeek={currentWeek}
-                  trimester={trimester}
-                  momName={partnerMomName}
-                  hasUpcomingAppointment={!!nextAppt}
-                />
-                {/* Registry in sidebar for partner */}
-                <Registries isReadOnly={true} />
-              </>
+              <WeeklySummary 
+                isPaid={false} 
+                checkinContext={null}
+                isPartnerView={true}
+                currentWeek={currentWeek}
+                trimester={trimester}
+                momName={partnerMomName}
+                hasUpcomingAppointment={!!nextAppt}
+              />
             )}
           </div>
         </div>
