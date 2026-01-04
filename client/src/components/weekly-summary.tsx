@@ -135,8 +135,9 @@ export function WeeklySummary({
   checkinContext = null,
   isPartnerView = false 
 }: WeeklySummaryProps) {
+  // Skip log fetching for partners - logs are private
   const { data: weekLogs = [], isLoading } = useWeekLogs();
-  const stats = useMemo(() => analyzeWeekLogs(weekLogs), [weekLogs]);
+  const stats = useMemo(() => isPartnerView ? analyzeWeekLogs([]) : analyzeWeekLogs(weekLogs), [weekLogs, isPartnerView]);
 
   // Nudge state - only for mom view
   const [nudgeCompleted, setNudgeCompleted] = useState(false);
@@ -173,7 +174,7 @@ export function WeeklySummary({
 
   const hasWeekData = !isLoading && stats.totalCheckins > 0;
 
-  // Partner view: simplified card
+  // Partner view: simplified card - doesn't show log data (private)
   if (isPartnerView) {
     return (
       <section className="bg-card rounded-xl p-6 border border-border shadow-sm">
@@ -185,44 +186,14 @@ export function WeeklySummary({
           <div>
             <h2 className="font-medium text-sm">Week at a Glance</h2>
             <p className="text-xs text-muted-foreground">
-              {hasWeekData 
-                ? `${stats.totalCheckins} check-in${stats.totalCheckins !== 1 ? "s" : ""} this week`
-                : "Waiting for check-ins"
-              }
+              Daily check-ins are private
             </p>
           </div>
         </div>
 
-        {hasWeekData && (
-          <>
-            {/* Summary Text - mood only, no symptoms for partner */}
-            <p className="text-sm text-foreground leading-relaxed mb-4">
-              {freeRecap}
-            </p>
-
-            {/* Visual Stats Row - mood only for partner */}
-            <div className="flex gap-3">
-              {/* Mood Distribution */}
-              <div className="flex-1 bg-muted/50 rounded-lg p-3">
-                <div className="text-xs text-muted-foreground mb-2">Mood this week</div>
-                <div className="flex items-center gap-2">
-                  {(["happy", "neutral", "sad"] as Mood[]).map((mood) => (
-                    <div key={mood} className="flex items-center gap-1">
-                      {moodIcons[mood]}
-                      <span className="text-xs font-medium">{stats.moodCounts[mood]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {!hasWeekData && !isLoading && (
-          <p className="text-sm text-muted-foreground">
-            Check back later to see how the week is going.
-          </p>
-        )}
+        <p className="text-sm text-muted-foreground">
+          Check-in details are kept private, but you can see appointments and find ways to support throughout the week.
+        </p>
       </section>
     );
   }

@@ -284,36 +284,37 @@ export default function Home() {
               checkinContext={checkinContext}
               isPartnerView={isPartnerView}
             />
-
-            {/* Partner Support Card - only for partners */}
-            {isPartnerView && (
-              <PartnerSupportCard 
-                currentWeek={currentWeek}
-                trimester={trimester}
-                momName={partnerMomName}
-              />
-            )}
           </div>
 
-          {/* Right column - only show check-in for mom */}
+          {/* Right column */}
           <div className="space-y-8">
+            {/* Daily Check-in - only for mom */}
             {!isPartnerView && (
               <DailyCheckIn currentWeek={currentWeek} />
             )}
             
-            {/* For partners, show a supportive message instead */}
+            {/* Partner Support Card - in the check-in spot for partners */}
             {isPartnerView && (
-              <div className="bg-card rounded-xl p-6 border border-border shadow-sm text-center">
-                <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-2xl">💙</span>
+              <>
+                <PartnerSupportCard 
+                  currentWeek={currentWeek}
+                  trimester={trimester}
+                  momName={partnerMomName}
+                />
+                
+                {/* Supportive message */}
+                <div className="bg-card rounded-xl p-6 border border-border shadow-sm text-center">
+                  <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mx-auto mb-3">
+                    <span className="text-2xl">💙</span>
+                  </div>
+                  <h3 className="font-serif text-lg font-semibold mb-2">
+                    You're Here
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Being present and involved means the world. Check back anytime to see updates and find ways to help.
+                  </p>
                 </div>
-                <h3 className="font-serif text-lg font-semibold mb-2">
-                  You're Here
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Being present and involved means the world. Check back anytime to see updates and find ways to help.
-                </p>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -327,7 +328,7 @@ export default function Home() {
           />
         )}
 
-        {/* Registries - read-only for partner */}
+        {/* Registries - visible to both, read-only for partner */}
         <Registries isReadOnly={isPartnerView} />
       </div>
     </Layout>

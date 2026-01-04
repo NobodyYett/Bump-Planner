@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { usePartnerAccess } from "@/contexts/PartnerContext";
 import { type CheckinSlot, getSuggestedSlot } from "@/lib/checkinSlots";
 import { subDays, format } from "date-fns";
 
@@ -91,12 +92,17 @@ export function useTodayLogs(date: string) {
 }
 
 // Logs for last 7 days (used by Weekly Summary)
+// Partners don't have access to logs (they're private)
 export function useWeekLogs() {
   const { user } = useAuth();
+  const { isPartnerView } = usePartnerAccess();
+  
+  // Don't fetch logs for partners - they're private
+  const shouldFetch = !!user && !isPartnerView;
 
   return useQuery({
     queryKey: ["pregnancyLogs", "week", user?.id],
-    enabled: !!user,
+    enabled: shouldFetch,
     queryFn: async () => {
       if (!user) return [];
 

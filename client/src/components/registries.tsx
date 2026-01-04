@@ -21,33 +21,83 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, ExternalLink, Trash2, Gift } from "lucide-react";
-import {
-  getRegistries,
-  addRegistry,
-  deleteRegistry,
-  isValidUrl,
-  getDomainFromUrl,
-  type Registry,
-} from "@/lib/registryStorage";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { usePartnerAccess } from "@/contexts/PartnerContext";
+
+type Registry = {
+  id: string;
+  name: string;
+  url: string;
+};
 
 interface RegistriesProps {
   isReadOnly?: boolean;
 }
 
+function isValidUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+function getDomainFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace("www.", "");
+  } catch {
+    return url;
+  }
+}
+
 export function Registries({ isReadOnly = false }: RegistriesProps) {
+  const { user } = useAuth();
+  const { isPartnerView, momUserId } = usePartnerAccess();
+  
   const [registries, setRegistries] = useState<Registry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Determine which user's registries to fetch
+  const targetUserId = isPartnerView ? momUserId : user?.id;
+
+  // Fetch registries from Supabase
   useEffect(() => {
-    setRegistries(getRegistries());
-  }, []);
+    async function loadRegistries() {
+      if (!targetUserId) {
+        setRegistries([]);
+        setIsLoading(false);
+        return;
+      }
 
-  function handleAdd() {
+      setIsLoading(true);
+
+      const { data, error: fetchError } = await supabase
+        .from("registries")
+        .select("id, name, url")
+        .eq("user_id", targetUserId)
+        .order("created_at", { ascending: true });
+
+      setIsLoading(false);
+
+      if (fetchError) {
+        console.error("Failed to load registries:", fetchError);
+        return;
+      }
+
+      setRegistries(data || []);
+    }
+
+    loadRegistries();
+  }, [targetUserId]);
+
+  async function handleAdd() {
+    if (!user || isPartnerView) return;
+    
     setError(null);
 
     if (!name.trim()) {
@@ -65,24 +115,56 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
       return;
     }
 
-    addRegistry(name, url);
-    setRegistries(getRegistries());
+    setIsSaving(true);
+
+    const { data, error: insertError } = await supabase
+      .from("registries")
+      .insert({
+        user_id: user.id,
+        name: name.trim(),
+        url: url.trim(),
+      })
+      .select("id, name, url")
+      .single();
+
+    setIsSaving(false);
+
+    if (insertError) {
+      console.error("Failed to add registry:", insertError);
+      setError("Failed to add registry. Please try again.");
+      return;
+    }
+
+    setRegistries((prev) => [...prev, data]);
     setName("");
     setUrl("");
     setIsAddOpen(false);
   }
 
-  function handleDelete() {
-    if (deleteId) {
-      deleteRegistry(deleteId);
-      setRegistries(getRegistries());
-      setDeleteId(null);
+  async function handleDelete() {
+    if (!deleteId || !user || isPartnerView) return;
+
+    const { error: deleteError } = await supabase
+      .from("registries")
+      .delete()
+      .eq("id", deleteId)
+      .eq("user_id", user.id);
+
+    if (deleteError) {
+      console.error("Failed to delete registry:", deleteError);
+      return;
     }
+
+    setRegistries((prev) => prev.filter((r) => r.id !== deleteId));
+    setDeleteId(null);
   }
 
   function openLink(registryUrl: string) {
     window.open(registryUrl, "_blank", "noopener,noreferrer");
   }
+
+  // Determine if actions should be disabled
+  const actionsDisabled = isReadOnly || isPartnerView;
 
   return (
     <section className="bg-card rounded-3xl border border-border shadow-sm px-6 py-6 md:px-10 md:py-8">
@@ -96,7 +178,7 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
               Registries
             </h2>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              {isReadOnly 
+              {actionsDisabled 
                 ? "View baby registry links"
                 : "Keep your baby registries in one place."
               }
@@ -104,8 +186,8 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
           </div>
         </div>
 
-        {/* Add button - hidden for read-only */}
-        {!isReadOnly && (
+        {/* Add button - hidden for read-only/partner */}
+        {!actionsDisabled && (
           <Sheet open={isAddOpen} onOpenChange={setIsAddOpen}>
             <SheetTrigger asChild>
               <Button size="sm" variant="outline" className="gap-1.5">
@@ -142,8 +224,8 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
                   <p className="text-sm text-destructive">{error}</p>
                 )}
 
-                <Button onClick={handleAdd} className="w-full">
-                  Add Registry
+                <Button onClick={handleAdd} className="w-full" disabled={isSaving}>
+                  {isSaving ? "Adding..." : "Add Registry"}
                 </Button>
               </div>
             </SheetContent>
@@ -151,10 +233,14 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
         )}
       </div>
 
-      {registries.length === 0 ? (
+      {isLoading ? (
+        <div className="text-center py-6 text-muted-foreground">
+          <p className="text-sm">Loading registries...</p>
+        </div>
+      ) : registries.length === 0 ? (
         <div className="text-center py-6 text-muted-foreground">
           <p className="text-sm">No registries added yet.</p>
-          {!isReadOnly && (
+          {!actionsDisabled && (
             <p className="text-xs mt-1">Tap "Add" to save your first registry link.</p>
           )}
         </div>
@@ -181,8 +267,8 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
                 </div>
               </button>
 
-              {/* Delete button - hidden for read-only */}
-              {!isReadOnly && (
+              {/* Delete button - hidden for read-only/partner */}
+              {!actionsDisabled && (
                 <button
                   type="button"
                   onClick={() => setDeleteId(registry.id)}
@@ -198,7 +284,7 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
       )}
 
       {/* Delete dialog - only needed for non-read-only */}
-      {!isReadOnly && (
+      {!actionsDisabled && (
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
