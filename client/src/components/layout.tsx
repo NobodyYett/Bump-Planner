@@ -91,7 +91,12 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
         {/* Main nav */}
         <nav className="space-y-1 mt-6">
           <NavItem href="/" icon={Heart} label="Today" />
-          <NavItem href="/timeline" icon={Calendar} label="Timeline" />
+          <NavItem 
+            href="/timeline" 
+            icon={Calendar} 
+            label="Timeline" 
+            hidden={isPartnerView}
+          />
           <NavItem 
             href="/journal" 
             icon={BookOpen} 
