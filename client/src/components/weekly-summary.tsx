@@ -256,17 +256,18 @@ export function WeeklySummary({
     [stats, trimester, hasUpcomingAppointment]
   );
 
-  // PARTNER VIEW
+  // PARTNER VIEW - Neutral styling, vertical stats
   if (isPartnerView) {
     return (
       <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-br from-purple-100 via-rose-50 to-pink-100 dark:from-purple-950/40 dark:via-rose-950/30 dark:to-pink-950/40 px-6 py-5 border-b border-border/50">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-white dark:bg-card shadow-sm border border-white/50 dark:border-border flex items-center justify-center">
-              <Heart className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+        {/* Header - neutral dark styling, no purple */}
+        <div className="px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+              <Heart className="w-4 h-4 text-muted-foreground" />
             </div>
             <div>
-              <h2 className="font-serif text-lg font-semibold text-foreground">How She's Feeling</h2>
+              <h2 className="font-medium text-sm text-foreground">How She's Feeling</h2>
               <p className="text-xs text-muted-foreground">
                 {hasWeekData 
                   ? `${stats.totalCheckins} check-in${stats.totalCheckins !== 1 ? "s" : ""} this week`
@@ -275,19 +276,25 @@ export function WeeklySummary({
               </p>
             </div>
           </div>
+        </div>
 
+        {/* Stats Section */}
+        <div className="p-5">
           {hasWeekData ? (
-            <>
-              <div className="bg-white/60 dark:bg-card/60 backdrop-blur-sm rounded-lg p-4 mb-4 border border-white/50 dark:border-border/50">
-                <p className="text-sm text-foreground leading-relaxed">{freeRecap}</p>
-              </div>
+            <div className="space-y-4">
+              {/* Summary text */}
+              <p className="text-sm text-foreground/90 leading-relaxed">
+                {freeRecap}
+              </p>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white/60 dark:bg-card/60 backdrop-blur-sm rounded-lg p-3 border border-white/50 dark:border-border/50">
-                  <div className="text-xs text-muted-foreground mb-2">Mood</div>
-                  <div className="flex items-center justify-center gap-1.5">
+              {/* Vertical stacked indicators */}
+              <div className="space-y-2">
+                {/* Mood Row */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <span className="text-xs text-muted-foreground">Mood</span>
+                  <div className="flex items-center gap-2">
                     {(["happy", "neutral", "sad"] as Mood[]).map((mood) => (
-                      <div key={mood} className="flex items-center gap-0.5">
+                      <div key={mood} className="flex items-center gap-1">
                         {moodIcons[mood]}
                         <span className="text-xs font-medium">{stats.moodCounts[mood]}</span>
                       </div>
@@ -295,16 +302,18 @@ export function WeeklySummary({
                   </div>
                 </div>
 
-                <div className="bg-white/60 dark:bg-card/60 backdrop-blur-sm rounded-lg p-3 border border-white/50 dark:border-border/50">
-                  <div className="text-xs text-muted-foreground mb-2">Top Symptom</div>
-                  <div className="text-sm font-medium text-center truncate">
+                {/* Top Symptom Row */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <span className="text-xs text-muted-foreground">Top Symptom</span>
+                  <span className="text-sm font-medium">
                     {stats.topSymptoms[0] || "None"}
-                  </div>
+                  </span>
                 </div>
 
-                <div className="bg-white/60 dark:bg-card/60 backdrop-blur-sm rounded-lg p-3 border border-white/50 dark:border-border/50">
-                  <div className="text-xs text-muted-foreground mb-2">Energy</div>
-                  <div className="flex items-center justify-center gap-1.5">
+                {/* Energy Row */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <span className="text-xs text-muted-foreground">Energy</span>
+                  <div className="flex items-center gap-1.5">
                     <Zap className={cn(
                       "w-4 h-4",
                       stats.dominantEnergy === "high" ? "text-green-500" :
@@ -316,25 +325,23 @@ export function WeeklySummary({
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
-            <div className="bg-white/60 dark:bg-card/60 backdrop-blur-sm rounded-lg p-4 border border-white/50 dark:border-border/50">
-              <p className="text-sm text-muted-foreground text-center">
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground">
                 Once she logs how she's feeling, you'll see a summary here.
               </p>
             </div>
           )}
         </div>
 
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <Heart className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-medium text-sm">How You Can Help</h3>
-              <p className="text-xs text-muted-foreground">Based on her check-ins</p>
-            </div>
+        {/* Support Section */}
+        <div className="px-5 pb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Heart className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              How You Can Help
+            </span>
           </div>
 
           {hasWeekData && supportSuggestions.length > 0 ? (
@@ -342,21 +349,21 @@ export function WeeklySummary({
               {supportSuggestions.map((suggestion, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-muted/40 border border-border/50"
+                  className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
                 >
-                  <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0 text-muted-foreground">
+                  <div className="w-7 h-7 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 text-muted-foreground">
                     {suggestion.icon}
                   </div>
-                  <p className="text-sm text-foreground/90 leading-relaxed pt-1">
+                  <p className="text-sm text-foreground/80 leading-relaxed">
                     {suggestion.text}
                   </p>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-4 px-4 rounded-lg bg-muted/30">
-              <p className="text-sm text-muted-foreground">
-                Support suggestions will appear here once check-ins are recorded.
+            <div className="text-center py-3 px-4 rounded-lg bg-muted/20">
+              <p className="text-xs text-muted-foreground">
+                Support suggestions will appear once check-ins are recorded.
               </p>
             </div>
           )}

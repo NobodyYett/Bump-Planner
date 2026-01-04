@@ -294,6 +294,73 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
   // Render
   // ============================================
 
+  // PARTNER VIEW - Compact card
+  if (isPartnerView) {
+    return (
+      <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        {/* Compact Header */}
+        <div className="px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+              <Gift className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <h2 className="font-medium text-sm text-foreground">Baby Registry</h2>
+              <p className="text-xs text-muted-foreground">
+                {registries.length > 0 
+                  ? `${registries.length} registry link${registries.length !== 1 ? "s" : ""} saved`
+                  : "View and share registry links"
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Compact Content */}
+        <div className="p-4">
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground text-center py-2">Loading...</p>
+          ) : registries.length > 0 ? (
+            <div className="space-y-2">
+              {registries.map((registry) => {
+                const displayName = getPlatformDisplayName(registry.registry_platform);
+                return (
+                  <div
+                    key={registry.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50"
+                  >
+                    <span className="text-sm font-medium text-foreground">{displayName}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openExternalLink(registry.registry_url)}
+                      className="gap-1.5 text-muted-foreground hover:text-foreground h-8 px-3"
+                    >
+                      Open
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              No registry added yet.
+            </p>
+          )}
+        </div>
+
+        {/* Compact Disclaimer */}
+        <div className="px-4 py-2 border-t border-border/50">
+          <p className="text-[10px] text-muted-foreground/70 text-center">
+            Managed by third-party platforms.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // MOM VIEW - Full card with all features
   return (
     <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       {/* Header */}
