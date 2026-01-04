@@ -18,9 +18,11 @@ import Appointments from "@/pages/appointments";
 import Settings from "@/pages/settings";
 import AiPage from "@/pages/ai";
 import JoinPage from "@/pages/join";
+import SubscribePage from "@/pages/subscribe";
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PartnerProvider, usePartnerAccess } from "@/contexts/PartnerContext";
+import { PremiumProvider } from "@/contexts/PremiumContext";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
 import { supabase } from "./lib/supabase";
 
@@ -342,6 +344,14 @@ function Router() {
         )}
       </Route>
 
+      <Route path="/subscribe">
+        {() => (
+          <RequireAuth>
+            <SubscribePage />
+          </RequireAuth>
+        )}
+      </Route>
+
       <Route path="/">
         {() => (
           <RequireAuth>
@@ -360,15 +370,17 @@ function Router() {
 export default function App() {
   return (
     <AuthProvider>
-      <PartnerProvider>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <DeepLinkListener />
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </QueryClientProvider>
-      </PartnerProvider>
+      <PremiumProvider>
+        <PartnerProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <DeepLinkListener />
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </PartnerProvider>
+      </PremiumProvider>
     </AuthProvider>
   );
 }

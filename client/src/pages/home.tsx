@@ -14,6 +14,7 @@ import { useTodayLogs } from "@/hooks/usePregnancyLogs";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { usePartnerAccess } from "@/contexts/PartnerContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -70,8 +71,8 @@ export default function Home() {
     };
   }, []);
 
-  // TODO: Replace with actual subscription check
-  const isPaid = false;
+  // Premium subscription status
+  const { isPremium: isPaid } = usePremium();
 
   // Get today's check-ins for nudge + AI context (only for mom view)
   const todayDate = format(new Date(), "yyyy-MM-dd");
@@ -257,9 +258,9 @@ export default function Home() {
 
         <div className={cn(
           "grid grid-cols-1 md:grid-cols-3 gap-8",
-          isPartnerView && "items-stretch"
+          isPartnerView && "md:items-stretch"
         )}>
-          <div className="md:col-span-2 space-y-8">
+          <div className="md:col-span-2 space-y-8 flex flex-col">
             <BabySizeDisplay currentWeek={currentWeek} />
 
             {/* Current Progress */}
@@ -311,7 +312,7 @@ export default function Home() {
               />
             )}
 
-            {/* Registry for Partner - in left column, same width as Current Progress */}
+            {/* Registry for Partner - in left column, marks end of left column content */}
             {isPartnerView && (
               <Registries isReadOnly={true} />
             )}
@@ -320,18 +321,18 @@ export default function Home() {
           {/* Right column */}
           <div className={cn(
             "space-y-6",
-            isPartnerView && "flex flex-col h-full"
+            isPartnerView && "self-stretch"
           )}>
             {/* Daily Check-in - only for mom */}
             {!isPartnerView && (
               <DailyCheckIn currentWeek={currentWeek} />
             )}
             
-            {/* "How She's Doing" card for partners - fills height */}
+            {/* "How She's Doing" card for partners - fills remaining height */}
             {isPartnerView && (
-              <div className="flex-1 flex flex-col">
+              <div className="h-full">
                 <WeeklySummary 
-                  isPaid={false} 
+                  isPaid={isPaid} 
                   checkinContext={null}
                   isPartnerView={true}
                   currentWeek={currentWeek}
@@ -369,6 +370,7 @@ export default function Home() {
               currentWeek={currentWeek}
               isPartnerView={isPartnerView}
               showSuggestions={showTaskSuggestions}
+              isPaid={isPaid}
             />
           );
         })()}

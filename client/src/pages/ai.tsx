@@ -1,14 +1,15 @@
 // client/src/pages/ai.tsx
 
 import { useState, useEffect } from "react";
-import { useSearch } from "wouter";
+import { useSearch, useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
 import { usePartnerAccess } from "@/contexts/PartnerContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import { supabase } from "@/lib/supabase";
-import { Loader2, Sparkles, Info, Lock } from "lucide-react";
+import { Loader2, Sparkles, Info } from "lucide-react";
 import {
   canAskAi,
   incrementAiCount,
@@ -17,9 +18,11 @@ import {
 } from "@/lib/aiLimits";
 
 export default function AiPage() {
-  const { dueDate, setDueDate, currentWeek, momName } = usePregnancyState();
+  const { dueDate, setDueDate, currentWeek } = usePregnancyState();
   const { isPartnerView } = usePartnerAccess();
+  const { isPremium: isPaid } = usePremium();
   const searchString = useSearch();
+  const [, setLocation] = useLocation();
   
   const params = new URLSearchParams(searchString);
   const prefillMood = params.get("mood");
@@ -28,13 +31,23 @@ export default function AiPage() {
   const prefillNotes = params.get("notes");
   const prefillWeek = params.get("week") || String(currentWeek);
 
-  const isPaid = false; // TODO: Replace with actual subscription check
-
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [remaining, setRemaining] = useState(() => getRemainingAiQuestions(isPaid));
+
+  // Update remaining when isPaid changes
+  useEffect(() => {
+    setRemaining(getRemainingAiQuestions(isPaid));
+  }, [isPaid]);
+
+  // Redirect partners away - FLO is mom-only
+  useEffect(() => {
+    if (isPartnerView) {
+      setLocation("/");
+    }
+  }, [isPartnerView, setLocation]);
 
   useEffect(() => {
     if (isPartnerView) return; // Don't prefill for partners
@@ -54,28 +67,9 @@ export default function AiPage() {
     }
   }, [prefillMood, prefillSymptoms, prefillSlot, prefillNotes, prefillWeek, isPartnerView]);
 
-  // Block partner access
+  // Don't render anything for partners (redirect in progress)
   if (isPartnerView) {
-    return (
-      <Layout dueDate={dueDate} setDueDate={setDueDate}>
-        <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <section className="text-center py-16">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-6">
-              <Lock className="w-10 h-10 text-muted-foreground" />
-            </div>
-            <h1 className="font-serif text-3xl font-bold mb-3">
-              FLO is for {momName || "Mom"}
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-md mx-auto">
-              FLO provides personalized pregnancy support and is only available to {momName || "the expecting parent"}.
-            </p>
-            <p className="text-sm text-muted-foreground mt-4">
-              Check out the home page for ways you can support this week.
-            </p>
-          </section>
-        </div>
-      </Layout>
-    );
+    return null;
   }
 
   async function handleAsk(e: React.FormEvent) {

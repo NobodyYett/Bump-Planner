@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { PremiumLock } from "@/components/premium-lock";
 
 interface SharedTask {
   id: string;
@@ -22,6 +23,7 @@ interface SharedTasksCardProps {
   currentWeek: number;
   isPartnerView?: boolean;
   showSuggestions?: boolean;  // Default: true
+  isPaid?: boolean;           // Premium subscription status
 }
 
 // Smart task suggestions based on current week
@@ -209,7 +211,27 @@ function getSmartSuggestions(
     .slice(0, 3);
 }
 
-export function SharedTasksCard({ momUserId, trimester, currentWeek, isPartnerView = false, showSuggestions = true }: SharedTasksCardProps) {
+// Sample suggestions for free users (always visible, shows value of premium)
+function getSampleSuggestions(currentWeek: number): TaskSuggestion[] {
+  if (currentWeek < 14) {
+    return [
+      { title: "Schedule first prenatal visit", priority: "high", reason: "Important for early care" },
+      { title: "Start prenatal vitamins", priority: "high", reason: "Key for baby's development" },
+    ];
+  } else if (currentWeek < 28) {
+    return [
+      { title: "Research childbirth classes", priority: "medium", reason: "Classes fill up — good to look early" },
+      { title: "Create baby registry", priority: "medium", reason: "Gives family time to shop" },
+    ];
+  } else {
+    return [
+      { title: "Pack hospital bag", priority: "high", reason: "Baby could come anytime!" },
+      { title: "Install car seat", priority: "high", reason: "Required to bring baby home" },
+    ];
+  }
+}
+
+export function SharedTasksCard({ momUserId, trimester, currentWeek, isPartnerView = false, showSuggestions = true, isPaid = false }: SharedTasksCardProps) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<SharedTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -217,10 +239,19 @@ export function SharedTasksCard({ momUserId, trimester, currentWeek, isPartnerVi
   const [isAdding, setIsAdding] = useState(false);
   const [tableExists, setTableExists] = useState(true);
 
-  // Get smart suggestions based on week and existing tasks (only if enabled)
+  // Get smart suggestions based on week and existing tasks
+  // For free users: always show sample suggestions (for locked preview)
+  // For paid users: respect the showSuggestions setting and filter existing
   const smartSuggestions = useMemo(
-    () => showSuggestions ? getSmartSuggestions(currentWeek, tasks) : [],
-    [currentWeek, tasks, showSuggestions]
+    () => {
+      // For free users, always show sample suggestions (unfiltered) so they see the value
+      if (!isPaid) {
+        return getSampleSuggestions(currentWeek);
+      }
+      // For paid users, respect the toggle setting and filter out existing tasks
+      return showSuggestions ? getSmartSuggestions(currentWeek, tasks) : [];
+    },
+    [currentWeek, tasks, showSuggestions, isPaid]
   );
 
   // Fetch tasks
@@ -427,48 +458,54 @@ export function SharedTasksCard({ momUserId, trimester, currentWeek, isPartnerVi
                 </p>
               </div>
               
-              {/* Smart suggestions when no tasks */}
+              {/* Smart suggestions when no tasks - Premium feature */}
               {smartSuggestions.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <Lightbulb className="w-3.5 h-3.5" />
-                    Suggested for week {currentWeek}
-                  </div>
-                  {smartSuggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleAddSuggestion(suggestion.title)}
-                      disabled={isAdding}
-                      className="w-full text-left p-3 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors",
-                          suggestion.priority === "high" 
-                            ? "border-amber-400 group-hover:border-amber-500" 
-                            : "border-border group-hover:border-primary/50"
-                        )}>
-                          <Plus className="w-3 h-3 text-muted-foreground group-hover:text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium group-hover:text-primary transition-colors">
-                            {suggestion.title}
-                          </p>
-                          {suggestion.reason && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {suggestion.reason}
+                <PremiumLock 
+                  isPaid={isPaid} 
+                  message="Suggestions based on pregnancy progress"
+                  showBadge={true}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <Lightbulb className="w-3.5 h-3.5" />
+                      Suggested for week {currentWeek}
+                    </div>
+                    {smartSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleAddSuggestion(suggestion.title)}
+                        disabled={isAdding}
+                        className="w-full text-left p-3 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={cn(
+                            "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors",
+                            suggestion.priority === "high" 
+                              ? "border-amber-400 group-hover:border-amber-500" 
+                              : "border-border group-hover:border-primary/50"
+                          )}>
+                            <Plus className="w-3 h-3 text-muted-foreground group-hover:text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium group-hover:text-primary transition-colors">
+                              {suggestion.title}
                             </p>
+                            {suggestion.reason && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {suggestion.reason}
+                              </p>
+                            )}
+                          </div>
+                          {suggestion.priority === "high" && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                              Recommended
+                            </span>
                           )}
                         </div>
-                        {suggestion.priority === "high" && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                            Recommended
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                      </button>
+                    ))}
+                  </div>
+                </PremiumLock>
               )}
             </div>
           ) : (
@@ -526,38 +563,44 @@ export function SharedTasksCard({ momUserId, trimester, currentWeek, isPartnerVi
                 </div>
               )}
 
-              {/* Smart suggestions when there are tasks */}
+              {/* Smart suggestions when there are tasks - Premium feature */}
               {smartSuggestions.length > 0 && (
-                <div className="pt-4 mt-4 border-t border-border">
-                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2 px-1">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Suggestions for week {currentWeek}
+                <PremiumLock 
+                  isPaid={isPaid} 
+                  message="Suggestions based on pregnancy progress"
+                  showBadge={true}
+                >
+                  <div className="pt-4 mt-4 border-t border-border">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2 px-1">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Suggestions for week {currentWeek}
+                    </div>
+                    <div className="space-y-1">
+                      {smartSuggestions.slice(0, 2).map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleAddSuggestion(suggestion.title)}
+                          disabled={isAdding}
+                          className="w-full text-left p-2.5 rounded-lg hover:bg-muted/50 transition-all group flex items-center gap-3"
+                        >
+                          <div className="w-5 h-5 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center shrink-0 group-hover:border-primary/50">
+                            <Plus className="w-3 h-3 text-muted-foreground/60 group-hover:text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                              {suggestion.title}
+                            </span>
+                          </div>
+                          {suggestion.priority === "high" && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100/50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
+                              Recommended
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    {smartSuggestions.slice(0, 2).map((suggestion, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleAddSuggestion(suggestion.title)}
-                        disabled={isAdding}
-                        className="w-full text-left p-2.5 rounded-lg hover:bg-muted/50 transition-all group flex items-center gap-3"
-                      >
-                        <div className="w-5 h-5 rounded-full border border-dashed border-muted-foreground/40 flex items-center justify-center shrink-0 group-hover:border-primary/50">
-                          <Plus className="w-3 h-3 text-muted-foreground/60 group-hover:text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                            {suggestion.title}
-                          </span>
-                        </div>
-                        {suggestion.priority === "high" && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100/50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
-                            Recommended
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                </PremiumLock>
               )}
             </div>
           )}
