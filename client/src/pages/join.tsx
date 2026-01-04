@@ -12,14 +12,12 @@ import { Loader2, Heart, CheckCircle, XCircle, LogIn } from "lucide-react";
 type JoinState = 
   | "loading"
   | "not-logged-in"
-  | "invalid-token"
-  | "already-accepted"
-  | "already-revoked"
+  | "invalid-token"      // Covers: invalid, already used, revoked (can't distinguish)
+  | "already-accepted"   // User is already a partner somewhere
   | "already-has-profile"
   | "ready-to-accept"
   | "accepting"
-  | "success"
-  | "error";
+  | "success";
 
 export default function JoinPage() {
   const searchString = useSearch();
@@ -80,39 +78,8 @@ export default function JoinPage() {
         return;
       }
 
-      // Hash the token and look up the invite
-      const tokenHash = await hashToken(token);
-      
-      const { data: invite, error } = await supabase
-        .from("partner_access")
-        .select("id, mom_user_id, accepted_at, revoked_at")
-        .eq("invite_token_hash", tokenHash)
-        .single();
-
-      if (error || !invite) {
-        setState("invalid-token");
-        setErrorMessage("This invite link is invalid or has expired.");
-        return;
-      }
-
-      if (invite.revoked_at) {
-        setState("already-revoked");
-        return;
-      }
-
-      if (invite.accepted_at) {
-        setState("already-accepted");
-        return;
-      }
-
-      // Fetch mom's name for display
-      const { data: momProfile } = await supabase
-        .from("pregnancy_profiles")
-        .select("mom_name, baby_name")
-        .eq("user_id", invite.mom_user_id)
-        .single();
-
-      setMomName(momProfile?.mom_name ?? null);
+      // We can NOT SELECT the invite (RLS blocks unclaimed invites for privacy)
+      // Instead, show ready state and do blind claim on accept
       setState("ready-to-accept");
     }
 
@@ -127,22 +94,44 @@ export default function JoinPage() {
     try {
       const tokenHash = await hashToken(token);
 
-      const { error } = await supabase
+      // BLIND CLAIM: Try to update without SELECT first
+      // RLS ensures: unclaimed + not revoked + not self-accept + sets partner to self
+      const { data: claimedInvite, error } = await supabase
         .from("partner_access")
         .update({
           partner_user_id: user.id,
           accepted_at: new Date().toISOString(),
         })
         .eq("invite_token_hash", tokenHash)
+        .is("partner_user_id", null)  // Must be unclaimed
         .is("accepted_at", null)
-        .is("revoked_at", null);
+        .is("revoked_at", null)
+        .select("id, mom_user_id")    // Get the row back to confirm success
+        .single();
 
-      if (error) throw error;
+      // If no row returned, invite was invalid/used/revoked
+      if (error || !claimedInvite) {
+        setState("invalid-token");
+        setErrorMessage("This invite is invalid, already used, or has been revoked.");
+        return;
+      }
+
+      // Success! Fetch mom's name for the success message
+      const { data: momProfile } = await supabase
+        .from("pregnancy_profiles")
+        .select("mom_name")
+        .eq("user_id", claimedInvite.mom_user_id)
+        .single();
+
+      setMomName(momProfile?.mom_name ?? null);
 
       // Refresh partner access context
       await refreshPartnerAccess();
       
       setState("success");
+      
+      // Clear the stored return URL since we're done
+      sessionStorage.removeItem("returnTo");
       
       // Redirect to home after a short delay
       setTimeout(() => {
@@ -150,14 +139,15 @@ export default function JoinPage() {
       }, 2000);
     } catch (err) {
       console.error("Failed to accept invite:", err);
-      setState("error");
-      setErrorMessage("Something went wrong. Please try again.");
+      setState("invalid-token");
+      setErrorMessage("This invite is invalid, already used, or has been revoked.");
     }
   }
 
   function handleLoginRedirect() {
-    // Store the current URL to redirect back after login
-    sessionStorage.setItem("returnTo", `/join?token=${token}`);
+    // Store the FULL current URL so login can redirect back
+    const returnUrl = window.location.pathname + window.location.search;
+    sessionStorage.setItem("returnTo", returnUrl);
     setLocation("/login");
   }
 
@@ -198,23 +188,7 @@ export default function JoinPage() {
               </div>
               <h1 className="font-serif text-2xl font-bold mb-2">Invalid invite</h1>
               <p className="text-muted-foreground mb-6">
-                {errorMessage || "This invite link is invalid or has expired."}
-              </p>
-              <Button variant="outline" onClick={() => setLocation("/")} className="w-full">
-                Go to home
-              </Button>
-            </>
-          )}
-
-          {/* Already revoked */}
-          {state === "already-revoked" && (
-            <>
-              <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
-                <XCircle className="w-8 h-8 text-amber-600 dark:text-amber-400" />
-              </div>
-              <h1 className="font-serif text-2xl font-bold mb-2">Invite revoked</h1>
-              <p className="text-muted-foreground mb-6">
-                This invite has been revoked. Please ask for a new invite link.
+                {errorMessage || "This invite link is invalid, has already been used, or was revoked. Please ask for a new invite."}
               </p>
               <Button variant="outline" onClick={() => setLocation("/")} className="w-full">
                 Go to home
@@ -303,24 +277,11 @@ export default function JoinPage() {
               </div>
               <h1 className="font-serif text-2xl font-bold mb-2">You're connected!</h1>
               <p className="text-muted-foreground mb-6">
-                Welcome to the journey. Redirecting you to the home page...
+                {momName 
+                  ? `Welcome! You can now follow ${momName}'s pregnancy journey.`
+                  : "Welcome to the journey."
+                } Redirecting...
               </p>
-            </>
-          )}
-
-          {/* Error */}
-          {state === "error" && (
-            <>
-              <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <XCircle className="w-8 h-8 text-destructive" />
-              </div>
-              <h1 className="font-serif text-2xl font-bold mb-2">Something went wrong</h1>
-              <p className="text-muted-foreground mb-6">
-                {errorMessage || "We couldn't process your invite. Please try again."}
-              </p>
-              <Button onClick={() => setState("ready-to-accept")} className="w-full">
-                Try again
-              </Button>
             </>
           )}
         </div>
