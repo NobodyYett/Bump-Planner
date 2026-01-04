@@ -278,12 +278,14 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Weekly Summary - simplified for partner view */}
-            <WeeklySummary 
-              isPaid={isPaid} 
-              checkinContext={checkinContext}
-              isPartnerView={isPartnerView}
-            />
+            {/* Weekly Summary - only for mom (partners see private message) */}
+            {!isPartnerView && (
+              <WeeklySummary 
+                isPaid={isPaid} 
+                checkinContext={checkinContext}
+                isPartnerView={isPartnerView}
+              />
+            )}
           </div>
 
           {/* Right column */}
@@ -293,28 +295,13 @@ export default function Home() {
               <DailyCheckIn currentWeek={currentWeek} />
             )}
             
-            {/* Partner Support Card - in the check-in spot for partners */}
+            {/* Partner Support Card - fills the right column for partners */}
             {isPartnerView && (
-              <>
-                <PartnerSupportCard 
-                  currentWeek={currentWeek}
-                  trimester={trimester}
-                  momName={partnerMomName}
-                />
-                
-                {/* Supportive message */}
-                <div className="bg-card rounded-xl p-6 border border-border shadow-sm text-center">
-                  <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mx-auto mb-3">
-                    <span className="text-2xl">💙</span>
-                  </div>
-                  <h3 className="font-serif text-lg font-semibold mb-2">
-                    You're Here
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Being present and involved means the world. Check back anytime to see updates and find ways to help.
-                  </p>
-                </div>
-              </>
+              <PartnerSupportCard 
+                currentWeek={currentWeek}
+                trimester={trimester}
+                momName={partnerMomName}
+              />
             )}
           </div>
         </div>

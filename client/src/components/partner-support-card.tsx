@@ -84,47 +84,53 @@ export function PartnerSupportCard({ currentWeek, trimester, momName }: PartnerS
   const tips = getTipsForWeek(currentWeek, trimester, momName);
   
   return (
-    <section className="bg-card rounded-xl p-6 border border-border shadow-sm">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
-          <Heart className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+    <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      {/* You're Here header */}
+      <div className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30 p-6 text-center border-b border-border">
+        <div className="w-14 h-14 rounded-full bg-white dark:bg-card border border-border flex items-center justify-center mx-auto mb-3 shadow-sm">
+          <span className="text-2xl">💙</span>
         </div>
-        <div>
-          <h2 className="font-serif text-lg font-semibold">How You Can Support This Week</h2>
-          <p className="text-xs text-muted-foreground">
-            Small gestures make a big difference
-          </p>
-        </div>
+        <h2 className="font-serif text-xl font-semibold mb-1">You're Here</h2>
+        <p className="text-sm text-muted-foreground">
+          Being present and involved means the world
+        </p>
       </div>
 
-      {/* Tips */}
-      <div className="space-y-3">
-        {tips.map((tip, index) => (
-          <div
-            key={index}
-            className={cn(
-              "flex items-start gap-3 p-3 rounded-lg",
-              "bg-muted/50 border border-border/50"
-            )}
-          >
-            <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0 mt-0.5">
-              {tip.icon}
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium">{tip.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                {tip.description}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Support tips section */}
+      <div className="p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Heart className="w-4 h-4 text-rose-500" />
+          <h3 className="text-sm font-medium">How You Can Support This Week</h3>
+        </div>
 
-      {/* Encouragement footer */}
-      <p className="text-xs text-muted-foreground text-center mt-4 pt-4 border-t border-border">
-        Being present and supportive is one of the best gifts you can give right now. 💙
-      </p>
+        {/* Tips */}
+        <div className="space-y-3">
+          {tips.map((tip, index) => (
+            <div
+              key={index}
+              className={cn(
+                "flex items-start gap-3 p-3 rounded-lg",
+                "bg-muted/50 border border-border/50"
+              )}
+            >
+              <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0 mt-0.5">
+                {tip.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{tip.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                  {tip.description}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Encouragement footer */}
+        <p className="text-xs text-muted-foreground text-center mt-5 pt-4 border-t border-border">
+          Check back anytime to see updates and find ways to help. 💙
+        </p>
+      </div>
     </section>
   );
 }
