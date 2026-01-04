@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getNudgeForCheckin, isNudgeCompleted, markNudgeCompleted, type CheckinContext } from "@/lib/nudges";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PremiumLock } from "@/components/premium-lock";
 
 interface WeeklySummaryProps {
   isPaid?: boolean;
@@ -278,11 +279,11 @@ export function WeeklySummary({
     [stats, trimester, hasUpcomingAppointment]
   );
 
-  // PARTNER VIEW - Neutral styling, vertical stats
+  // PARTNER VIEW - Fills height, larger brief, better spacing
   if (isPartnerView) {
     return (
-      <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-        {/* Header - neutral dark styling, no purple */}
+      <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden h-full flex flex-col">
+        {/* Header */}
         <div className="px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
@@ -302,48 +303,50 @@ export function WeeklySummary({
           </div>
         </div>
 
-        {/* Stats Section */}
-        <div className="p-5">
+        {/* Stats Section - grows to fill space */}
+        <div className="p-6 flex-1 flex flex-col">
           {hasWeekData ? (
-            <div className="space-y-4">
-              {/* Summary text - personal for partner */}
-              <p className="text-sm text-foreground/90 leading-relaxed">
-                {partnerSummary}
-              </p>
+            <div className="flex-1 flex flex-col">
+              {/* Summary brief - CENTERED, LARGER FONT */}
+              <div className="py-8 px-6 flex items-center justify-center">
+                <p className="text-xl text-foreground leading-relaxed font-medium text-center">
+                  {partnerSummary}
+                </p>
+              </div>
 
               {/* Vertical stacked indicators */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {/* Mood Row */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-                  <span className="text-xs text-muted-foreground">Mood</span>
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
+                  <span className="text-sm text-muted-foreground">Mood</span>
+                  <div className="flex items-center gap-3">
                     {(["happy", "neutral", "sad"] as Mood[]).map((mood) => (
                       <div key={mood} className="flex items-center gap-1">
                         {moodIcons[mood]}
-                        <span className="text-xs font-medium">{stats.moodCounts[mood]}</span>
+                        <span className="text-sm font-medium">{stats.moodCounts[mood]}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Top Symptom Row */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-                  <span className="text-xs text-muted-foreground">Top Symptom</span>
-                  <span className="text-sm font-medium">
+                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
+                  <span className="text-sm text-muted-foreground">Top Symptom</span>
+                  <span className="text-sm font-semibold">
                     {stats.topSymptoms[0] || "None"}
                   </span>
                 </div>
 
                 {/* Energy Row */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-                  <span className="text-xs text-muted-foreground">Energy</span>
+                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border border-border/50">
+                  <span className="text-sm text-muted-foreground">Energy</span>
                   <div className="flex items-center gap-1.5">
                     <Zap className={cn(
                       "w-4 h-4",
                       stats.dominantEnergy === "high" ? "text-green-500" :
                       stats.dominantEnergy === "medium" ? "text-yellow-500" : "text-red-500"
                     )} />
-                    <span className="text-sm font-medium capitalize">
+                    <span className="text-sm font-semibold capitalize">
                       {stats.dominantEnergy || "—"}
                     </span>
                   </div>
@@ -351,8 +354,8 @@ export function WeeklySummary({
               </div>
             </div>
           ) : (
-            <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground">
+            <div className="text-center py-8 flex-1 flex items-center justify-center">
+              <p className="text-base text-muted-foreground">
                 {momName 
                   ? `Once ${momName} logs how she's feeling, you'll see a summary here.`
                   : "Once she logs how she's feeling, you'll see a summary here."
@@ -360,11 +363,14 @@ export function WeeklySummary({
               </p>
             </div>
           )}
+          
+          {/* Spacer to push support section to bottom */}
+          <div className="flex-1" />
         </div>
 
-        {/* Support Section */}
-        <div className="px-5 pb-5">
-          <div className="flex items-center gap-2 mb-3">
+        {/* Support Section - at bottom */}
+        <div className="px-6 pb-6">
+          <div className="flex items-center gap-2 mb-4">
             <Heart className="w-4 h-4 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               How You Can Help
@@ -372,16 +378,16 @@ export function WeeklySummary({
           </div>
 
           {hasWeekData && supportSuggestions.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {supportSuggestions.map((suggestion, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
+                  className="flex items-start gap-3 p-4 rounded-lg bg-muted/30 border border-border/50"
                 >
-                  <div className="w-7 h-7 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 text-muted-foreground">
+                  <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center shrink-0 text-muted-foreground">
                     {suggestion.icon}
                   </div>
-                  <p className="text-sm text-foreground/80 leading-relaxed">
+                  <p className="text-sm text-foreground/90 leading-relaxed pt-1">
                     {suggestion.text}
                   </p>
                 </div>
@@ -439,46 +445,43 @@ export function WeeklySummary({
         <>
           <p className="text-sm text-foreground leading-relaxed mb-4">{freeRecap}</p>
 
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="text-xs text-muted-foreground mb-2">Mood</div>
-              <div className="flex items-center gap-1.5">
-                {(["happy", "neutral", "sad"] as Mood[]).map((mood) => (
-                  <div key={mood} className="flex items-center gap-0.5">
-                    {moodIcons[mood]}
-                    <span className="text-xs font-medium">{stats.moodCounts[mood]}</span>
-                  </div>
-                ))}
+          {/* Detailed stats - Premium feature */}
+          <PremiumLock isPaid={isPaid} showBadge={true}>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="bg-muted/50 rounded-lg p-3">
+                <div className="text-xs text-muted-foreground mb-2">Mood</div>
+                <div className="flex items-center gap-1.5">
+                  {(["happy", "neutral", "sad"] as Mood[]).map((mood) => (
+                    <div key={mood} className="flex items-center gap-0.5">
+                      {moodIcons[mood]}
+                      <span className="text-xs font-medium">{stats.moodCounts[mood]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-muted/50 rounded-lg p-3">
+                <div className="text-xs text-muted-foreground mb-2">Top symptom</div>
+                <div className="text-sm font-medium truncate">
+                  {stats.topSymptoms[0] || "None"}
+                </div>
+              </div>
+
+              <div className="bg-muted/50 rounded-lg p-3">
+                <div className="text-xs text-muted-foreground mb-2">Energy</div>
+                <div className="flex items-center gap-1">
+                  <Zap className={cn(
+                    "w-4 h-4",
+                    stats.dominantEnergy === "high" ? "text-green-500" :
+                    stats.dominantEnergy === "medium" ? "text-yellow-500" : "text-red-500"
+                  )} />
+                  <span className="text-sm font-medium capitalize">
+                    {stats.dominantEnergy || "—"}
+                  </span>
+                </div>
               </div>
             </div>
-
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="text-xs text-muted-foreground mb-2">Top symptom</div>
-              <div className="text-sm font-medium truncate">
-                {stats.topSymptoms[0] || "None"}
-              </div>
-            </div>
-
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="text-xs text-muted-foreground mb-2">Energy</div>
-              <div className="flex items-center gap-1">
-                <Zap className={cn(
-                  "w-4 h-4",
-                  stats.dominantEnergy === "high" ? "text-green-500" :
-                  stats.dominantEnergy === "medium" ? "text-yellow-500" : "text-red-500"
-                )} />
-                <span className="text-sm font-medium capitalize">
-                  {stats.dominantEnergy || "—"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {!isPaid && (
-            <p className="text-xs text-muted-foreground text-center">
-              Upgrade to Premium for deeper insights and personalized suggestions.
-            </p>
-          )}
+          </PremiumLock>
         </>
       )}
 
