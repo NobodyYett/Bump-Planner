@@ -19,6 +19,7 @@ import Settings from "@/pages/settings";
 import AiPage from "@/pages/ai";
 import JoinPage from "@/pages/join";
 import SubscribePage from "@/pages/subscribe";
+import PartnerPaywall from "@/pages/partner-paywall";
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PartnerProvider, usePartnerAccess } from "@/contexts/PartnerContext";
@@ -173,12 +174,13 @@ function AuthCallback() {
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading: authLoading } = useAuth();
-  const { isPartnerView, isLoading: partnerLoading } = usePartnerAccess();
+  const { isPartnerView, isLoading: partnerLoading, momIsPremium } = usePartnerAccess();
   const { isProfileLoading, isOnboardingComplete } = usePregnancyState();
   const [location, navigate] = useLocation();
 
   // Check if we're on the /join page - special handling needed
   const isJoinPage = location.startsWith("/join") || window.location.pathname.startsWith("/join");
+  const isPaywallPage = location === "/partner-paywall";
 
   // Ensure profile exists - BUT NOT for partners OR users on /join page
   useEffect(() => {
@@ -237,6 +239,18 @@ function RequireAuth({ children }: { children: JSX.Element }) {
       return;
     }
 
+    // Partner premium check - redirect to paywall if mom's premium lapsed
+    if (isPartnerView && !momIsPremium && !isPaywallPage) {
+      navigate("/partner-paywall", { replace: true });
+      return;
+    }
+
+    // If partner has premium restored, redirect away from paywall
+    if (isPartnerView && momIsPremium && isPaywallPage) {
+      navigate("/", { replace: true });
+      return;
+    }
+
     // Partners skip onboarding and profile checks
     if (isPartnerView) return;
     
@@ -254,7 +268,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
     if (isOnboardingComplete && window.location.pathname === "/onboarding") {
       navigate("/", { replace: true });
     }
-  }, [authLoading, partnerLoading, user, isPartnerView, isJoinPage, isProfileLoading, isOnboardingComplete, navigate, location]);
+  }, [authLoading, partnerLoading, user, isPartnerView, momIsPremium, isJoinPage, isPaywallPage, isProfileLoading, isOnboardingComplete, navigate, location]);
 
   // For /join page, only need auth loading check
   if (isJoinPage) {
@@ -348,6 +362,14 @@ function Router() {
         {() => (
           <RequireAuth>
             <SubscribePage />
+          </RequireAuth>
+        )}
+      </Route>
+
+      <Route path="/partner-paywall">
+        {() => (
+          <RequireAuth>
+            <PartnerPaywall />
           </RequireAuth>
         )}
       </Route>

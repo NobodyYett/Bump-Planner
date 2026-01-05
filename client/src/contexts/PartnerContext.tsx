@@ -12,6 +12,7 @@ interface PartnerContextValue {
   // When viewing as partner, this is the mom's info
   momUserId: string | null;
   momName: string | null;
+  momIsPremium: boolean;
   
   // For mom: active partner info
   hasActivePartner: boolean;
@@ -30,6 +31,7 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [momUserId, setMomUserId] = useState<string | null>(null);
   const [momName, setMomName] = useState<string | null>(null);
+  const [momIsPremium, setMomIsPremium] = useState(false);
   const [hasActivePartner, setHasActivePartner] = useState(false);
   const [partnerAcceptedAt, setPartnerAcceptedAt] = useState<string | null>(null);
 
@@ -55,6 +57,7 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
         setIsPartnerView(false);
         setMomUserId(null);
         setMomName(null);
+        setMomIsPremium(false);
 
         // Check if they have an active partner
         const { data: partnerData } = await supabase
@@ -85,9 +88,17 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
             .eq("user_id", partnerAccess.mom_user_id)
             .single();
 
+          // Check mom's premium status from profiles table
+          const { data: momProfileData } = await supabase
+            .from("profiles")
+            .select("is_premium")
+            .eq("id", partnerAccess.mom_user_id)
+            .single();
+
           setIsPartnerView(true);
           setMomUserId(partnerAccess.mom_user_id);
           setMomName(momProfile?.mom_name ?? null);
+          setMomIsPremium(momProfileData?.is_premium ?? false);
           setHasActivePartner(false);
           setPartnerAcceptedAt(null);
         } else {
@@ -95,6 +106,7 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
           setIsPartnerView(false);
           setMomUserId(null);
           setMomName(null);
+          setMomIsPremium(false);
           setHasActivePartner(false);
           setPartnerAcceptedAt(null);
         }
@@ -118,10 +130,11 @@ export function PartnerProvider({ children }: { children: React.ReactNode }) {
     isLoading: isLoading || authLoading,
     momUserId,
     momName,
+    momIsPremium,
     hasActivePartner,
     partnerAcceptedAt,
     refreshPartnerAccess: checkPartnerAccess,
-  }), [isPartnerView, isLoading, authLoading, momUserId, momName, hasActivePartner, partnerAcceptedAt, checkPartnerAccess]);
+  }), [isPartnerView, isLoading, authLoading, momUserId, momName, momIsPremium, hasActivePartner, partnerAcceptedAt, checkPartnerAccess]);
 
   return (
     <PartnerContext.Provider value={value}>

@@ -1,21 +1,79 @@
 PODS:
-  - RevenueCat (5.52.1)
-  - RevenueCatUI (5.52.1):
-    - RevenueCat (= 5.52.1)
+  - Capacitor (7.4.4):
+    - CapacitorCordova
+  - CapacitorApp (7.1.1):
+    - Capacitor
+  - CapacitorBrowser (7.0.3):
+    - Capacitor
+  - CapacitorCommunityAppleSignIn (7.1.0):
+    - Capacitor
+  - CapacitorCordova (7.4.4)
+  - CapacitorFilesystem (7.1.6):
+    - Capacitor
+    - IONFilesystemLib (~> 1.0.1)
+  - CapacitorLocalNotifications (7.0.4):
+    - Capacitor
+  - CapacitorShare (7.0.3):
+    - Capacitor
+  - IONFilesystemLib (1.0.1)
+  - PurchasesHybridCommon (13.26.0):
+    - RevenueCat (= 5.20.0)
+  - RevenueCat (5.20.0)
+  - RevenuecatPurchasesCapacitor (9.2.2):
+    - Capacitor
+    - PurchasesHybridCommon (= 13.26.0)
 
 DEPENDENCIES:
-  - RevenueCat (~> 5.0)
-  - RevenueCatUI (~> 5.0)
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
+  - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
+  - "CapacitorCommunityAppleSignIn (from `../../node_modules/@capacitor-community/apple-sign-in`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorFilesystem (from `../../node_modules/@capacitor/filesystem`)"
+  - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
+  - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
+  - "RevenuecatPurchasesCapacitor (from `../../node_modules/@revenuecat/purchases-capacitor`)"
 
 SPEC REPOS:
   trunk:
+    - IONFilesystemLib
+    - PurchasesHybridCommon
     - RevenueCat
-    - RevenueCatUI
+
+EXTERNAL SOURCES:
+  Capacitor:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorApp:
+    :path: "../../node_modules/@capacitor/app"
+  CapacitorBrowser:
+    :path: "../../node_modules/@capacitor/browser"
+  CapacitorCommunityAppleSignIn:
+    :path: "../../node_modules/@capacitor-community/apple-sign-in"
+  CapacitorCordova:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorFilesystem:
+    :path: "../../node_modules/@capacitor/filesystem"
+  CapacitorLocalNotifications:
+    :path: "../../node_modules/@capacitor/local-notifications"
+  CapacitorShare:
+    :path: "../../node_modules/@capacitor/share"
+  RevenuecatPurchasesCapacitor:
+    :path: "../../node_modules/@revenuecat/purchases-capacitor"
 
 SPEC CHECKSUMS:
-  RevenueCat: c3d07077a0cc70b7c90a5a6072d60f9905d2dbc0
-  RevenueCatUI: cf72c82fae460b511a069f266429ea03db45722d
+  Capacitor: 358dd1c3fdd71d969547b17e159fd8a7736cb45f
+  CapacitorApp: 63b237168fc869e758481dba283315a85743ee78
+  CapacitorBrowser: b98aa3db018a2ce4c68242d27e596c344f3b81b3
+  CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
+  CapacitorCordova: bf648a636f3c153f652d312ae145fb508b6ffced
+  CapacitorFilesystem: 66f05ee0d8b1ccdc00d509091273a9b3b57c4a0b
+  CapacitorLocalNotifications: ba2a08bd92887b08f352e6b2db430575cef0cea3
+  CapacitorShare: a4f4f86eabd4b3ff52ba6a11b754713c6926a8d1
+  IONFilesystemLib: 89258b8e3e85465da93127d25d7ce37f977e8a6f
+  PurchasesHybridCommon: fa166fc8b385cf80f581f923c91d8ccffe5dd7f8
+  RevenueCat: e47ff90dfd271fde155a4befe48e8fc02e8281e4
+  RevenuecatPurchasesCapacitor: 6727a4dc1455bdf2374259420719ce5dfbe957fa
 
-PODFILE CHECKSUM: fdf989628a6102b8e33da1d70d60f7de74ba2010
+PODFILE CHECKSUM: 17aebc2d7e624a41dc42b076fb86561b2503f46b
 
 COCOAPODS: 1.16.2
