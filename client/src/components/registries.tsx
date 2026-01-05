@@ -482,7 +482,7 @@ export function Registries({ isReadOnly = false }: RegistriesProps) {
       {/* Disclaimer */}
       <div className="px-6 py-3 border-t border-border bg-muted/20">
         <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-          Registries are created and managed by third-party platforms. Bump Planner does not sell products or provide shopping recommendations.
+          Registries are created and managed by third-party platforms. Bloom does not sell products or provide shopping recommendations.
         </p>
       </div>
 

@@ -30,7 +30,7 @@ export default function Login() {
 
       // Use custom URL scheme for mobile deep link callback
       const redirectTo = Capacitor.isNativePlatform()
-        ? "com.bumpplanner.app://auth/callback"
+        ? "com.zelkz.bloom://auth/callback"
         : `${window.location.origin}/auth/callback`;
 
       console.log("OAuth redirect URL:", redirectTo);
@@ -107,7 +107,7 @@ export default function Login() {
             Welcome to
           </p>
           <h1 className="text-3xl font-serif font-semibold tracking-tight mb-3">
-            Bump Planner
+            Bloom
           </h1>
 
           <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-3">
@@ -152,7 +152,7 @@ export default function Login() {
         </div>
 
         <p className="mt-6 text-[11px] text-center text-muted-foreground leading-relaxed">
-          By continuing, you agree that Bump Planner may store your due date and
+          By continuing, you agree that Bloom may store your due date and
           pregnancy check-ins securely so you can access them from any device.
         </p>
       </div>

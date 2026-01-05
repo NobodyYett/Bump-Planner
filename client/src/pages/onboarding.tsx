@@ -205,7 +205,7 @@ export default function Onboarding() {
                 Welcome to
               </p>
               <h1 className="text-3xl font-serif font-semibold tracking-tight">
-                Bump Planner
+                Bloom
               </h1>
               <p className="text-sm text-muted-foreground">
                 Thank you for joining! We&apos;re excited to be part of your pregnancy journey.

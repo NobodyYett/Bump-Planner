@@ -76,7 +76,7 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
             <Baby className="w-5 h-5" />
           </div>
           <span className="font-serif text-2xl font-semibold tracking-tight">
-            Bump Planner
+            Bloom
           </span>
         </div>
         

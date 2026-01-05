@@ -1,13 +1,13 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.bumpplanner.app",
-  appName: "Bump Planner",
+  appId: "com.zelkz.bloom",
+  appName: "Bloom",
   webDir: "dist/public",
 
   ios: {
     contentInset: "automatic",
-    scheme: "com.bumpplanner.app",
+    scheme: "com.zelkz.bloom",
   },
 
   android: {
@@ -16,7 +16,7 @@ const config: CapacitorConfig = {
 
   plugins: {
     App: {
-      allowExternalUrls: ["com.bumpplanner.app://"],
+      allowExternalUrls: ["com.zelkz.bloom://"],
     },
   },
 };

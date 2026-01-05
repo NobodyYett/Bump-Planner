@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bump Planner</string>
+	<string>Bloom</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -27,15 +27,15 @@
 			<string></string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>bumpplanner</string>
+				<string>bloom</string>
 			</array>
 		</dict>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.bumpplanner.app</string>
+			<string>com.zelkz.bloom</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.bumpplanner.app</string>
+				<string>com.zelkz.bloom</string>
 			</array>
 		</dict>
 	</array>

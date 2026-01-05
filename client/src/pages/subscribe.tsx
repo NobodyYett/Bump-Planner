@@ -176,7 +176,7 @@ export default function SubscribePage() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
               <Heart className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="font-serif text-3xl font-bold mb-2">Bump Premium</h1>
+            <h1 className="font-serif text-3xl font-bold mb-2">Bloom Premium</h1>
             <p className="text-muted-foreground">
               Everything you need to prepare together
             </p>
@@ -225,7 +225,7 @@ export default function SubscribePage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
             <Heart className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="font-serif text-3xl font-bold mb-2">Bump Premium</h1>
+          <h1 className="font-serif text-3xl font-bold mb-2">Bloom Premium</h1>
           <p className="text-muted-foreground">
             Everything you need to prepare together
           </p>

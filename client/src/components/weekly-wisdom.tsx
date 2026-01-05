@@ -95,7 +95,7 @@ Please respond in this exact structure:
 Keep your tone warm, supportive, and calm. Avoid medical jargon.
 `.trim();
 
-    const { data, error } = await supabase.functions.invoke("ask-flo", {
+    const { data, error } = await supabase.functions.invoke("ask-ivy", {
       body: { question: enhancedPrompt, week: currentWeek, trimester },
     });
 
@@ -103,7 +103,7 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
 
     if (error) {
       console.error(error);
-      setErrorMsg("FLO couldn't answer right now. Please try again in a moment.");
+      setErrorMsg("Ivy couldn't answer right now. Please try again in a moment.");
       return;
     }
 
@@ -111,7 +111,7 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
     incrementAiCount();
     setRemaining(getRemainingAiQuestions(isPaid));
 
-    setAnswer(data?.answer ?? "FLO answered, but something looked empty.");
+    setAnswer(data?.answer ?? "Ivy answered, but something looked empty.");
   }
 
   return (
@@ -128,7 +128,7 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
         </div>
         <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-[10px] font-medium text-primary">
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          Powered by FLO
+          Powered by Ivy
         </span>
       </div>
 
@@ -137,13 +137,13 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
         {momTip}
       </p>
 
-      {/* Ask FLO input */}
+      {/* Ask Ivy input */}
       <form
         onSubmit={handleAsk}
         className="mt-2 flex flex-col gap-3 border-t border-primary/20 pt-4"
       >
         <p className="text-[11px] text-primary/80">
-          Questions about this week, how you're feeling, or what to expect? Ask FLO below.
+          Questions about this week, how you're feeling, or what to expect? Ask Ivy below.
         </p>
 
         <div className="flex flex-col md:flex-row gap-2">
@@ -165,7 +165,7 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
                 Thinking
               </>
             ) : (
-              "Ask FLO"
+              "Ask Ivy"
             )}
           </Button>
         </div>
@@ -186,7 +186,7 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
         <div className="flex items-start gap-1.5 text-[10px] text-primary/50">
           <Info className="w-3 h-3 shrink-0 mt-0.5" />
           <p>
-            FLO is here to support you — not replace medical care. If something feels urgent, contact your provider or emergency services.
+            Ivy is here to support you — not replace medical care. If something feels urgent, contact your provider or emergency services.
           </p>
         </div>
       </form>
@@ -213,13 +213,13 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
       {answer && (
         <div className="mt-3 rounded-2xl bg-primary/5 border border-primary/20 px-4 py-3">
           <p className="text-[11px] uppercase tracking-[0.2em] text-primary/70 mb-1">
-            FLO's reply
+            Ivy's reply
           </p>
           <p className="text-sm leading-relaxed whitespace-pre-wrap">
             {answer}
           </p>
           <p className="mt-2 text-[10px] text-primary/70">
-            FLO shares general education & emotional support only. For anything medical or urgent, please contact your healthcare provider.
+            Ivy shares general education & emotional support only. For anything medical or urgent, please contact your healthcare provider.
           </p>
         </div>
       )}

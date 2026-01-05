@@ -47,16 +47,16 @@ export function incrementAiCount(): number {
 }
 
 export function canAskAi(isPaid: boolean = false): boolean {
-  const limit = isPaid ? 5 : 1;
+  const limit = isPaid ? 5 : 2;
   return getTodayAiCount() < limit;
 }
 
 export function getRemainingAiQuestions(isPaid: boolean = false): number {
-  const limit = isPaid ? 5 : 1;
+  const limit = isPaid ? 5 : 2;
   const used = getTodayAiCount();
   return Math.max(0, limit - used);
 }
 
 export function getAiDailyLimit(isPaid: boolean = false): number {
-  return isPaid ? 5 : 1;
+  return isPaid ? 5 : 2;
 }

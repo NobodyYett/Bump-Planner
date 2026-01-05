@@ -59,19 +59,19 @@ export function WeeklyGuidance({ currentWeek, trimester }: WeeklyGuidanceProps) 
     setAnswer(null);
 
     try {
-      // Add week + trimester context before sending to FLO
+      // Add week + trimester context before sending to Ivy
       const decoratedQuestion = `I'm around week ${currentWeek} of pregnancy, in the ${getTrimesterLabel(
         trimester
       )}. ${trimmed}`;
 
-      const { data, error } = await supabase.functions.invoke("ask-flo", {
+      const { data, error } = await supabase.functions.invoke("ask-ivy", {
         body: { question: decoratedQuestion },
       });
 
       if (error) {
         console.error(error);
         toast({
-          title: "FLO is unavailable",
+          title: "Ivy is unavailable",
           description: "Please try again in a little while.",
           variant: "destructive",
         });
@@ -79,7 +79,7 @@ export function WeeklyGuidance({ currentWeek, trimester }: WeeklyGuidanceProps) 
       }
 
       if (!data || !data.answer) {
-        setAnswer("FLO couldn't find a helpful answer this time. Try rephrasing?");
+        setAnswer("Ivy couldn't find a helpful answer this time. Try rephrasing?");
       } else {
         setAnswer(data.answer);
       }
@@ -114,7 +114,7 @@ export function WeeklyGuidance({ currentWeek, trimester }: WeeklyGuidanceProps) 
           </div>
           <div className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs text-muted-foreground bg-background/80">
             <Sparkles className="w-3 h-3" />
-            <span>Powered by FLO</span>
+            <span>Powered by Ivy</span>
           </div>
         </div>
       </CardHeader>
@@ -159,18 +159,18 @@ export function WeeklyGuidance({ currentWeek, trimester }: WeeklyGuidanceProps) 
           </div>
         </div>
 
-        {/* Ask FLO */}
+        {/* Ask Ivy */}
         <div className="pt-4 border-t border-border/60 space-y-3">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
             <p className="text-xs text-muted-foreground">
-              Have a question about this week? Ask FLO below.
+              Have a question about this week? Ask Ivy below.
             </p>
           </div>
 
           <div className="flex flex-col md:flex-row gap-2">
             <Input
-              placeholder="Ask FLO about symptoms, feelings, or what to expect this week…"
+              placeholder="Ask Ivy about symptoms, feelings, or what to expect this week…"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
@@ -181,7 +181,7 @@ export function WeeklyGuidance({ currentWeek, trimester }: WeeklyGuidanceProps) 
               }}
             />
             <Button type="button" onClick={handleAsk} disabled={loading}>
-              {loading ? "FLO is thinking…" : "Ask FLO"}
+              {loading ? "Ivy is thinking…" : "Ask Ivy"}
             </Button>
           </div>
 

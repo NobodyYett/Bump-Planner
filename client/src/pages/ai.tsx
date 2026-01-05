@@ -42,7 +42,7 @@ export default function AiPage() {
     setRemaining(getRemainingAiQuestions(isPaid));
   }, [isPaid]);
 
-  // Redirect partners away - FLO is mom-only
+  // Redirect partners away - Ivy is mom-only
   useEffect(() => {
     if (isPartnerView) {
       setLocation("/");
@@ -99,7 +99,7 @@ Please respond in this exact structure:
 Keep your tone warm, supportive, and calm. Avoid medical jargon.
 `.trim();
 
-    const { data, error } = await supabase.functions.invoke("ask-flo", {
+    const { data, error } = await supabase.functions.invoke("ask-ivy", {
       body: { question: enhancedPrompt },
     });
 
@@ -107,13 +107,13 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
 
     if (error) {
       console.error(error);
-      setErrorMsg("FLO couldn't answer right now. Please try again in a moment.");
+      setErrorMsg("Ivy couldn't answer right now. Please try again in a moment.");
       return;
     }
 
     incrementAiCount();
     setRemaining(getRemainingAiQuestions(isPaid));
-    setAnswer(data?.answer ?? "FLO answered, but something looked empty.");
+    setAnswer(data?.answer ?? "Ivy answered, but something looked empty.");
   }
 
   const limitReached = !canAskAi(isPaid);
@@ -126,7 +126,7 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-2">
             <Sparkles className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="font-serif text-3xl font-bold">Ask FLO</h1>
+          <h1 className="font-serif text-3xl font-bold">Ask Ivy</h1>
           <p className="text-muted-foreground">Your gentle companion for pregnancy questions</p>
         </header>
 
@@ -157,18 +157,18 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
 
             <Button type="submit" className="w-full" disabled={loading || limitReached || !question.trim()}>
               {loading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />FLO is thinking...</>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Ivy is thinking...</>
               ) : limitReached ? (
                 "You've reached today's limit"
               ) : (
-                <><Sparkles className="w-4 h-4 mr-2" />Ask FLO</>
+                <><Sparkles className="w-4 h-4 mr-2" />Ask Ivy</>
               )}
             </Button>
 
             {/* Subtle micro-disclaimer */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Info className="w-3.5 h-3.5 shrink-0" />
-              <p>FLO is here to support you — not replace medical care. If something feels urgent, contact your provider or emergency services.</p>
+              <p>Ivy is here to support you — not replace medical care. If something feels urgent, contact your provider or emergency services.</p>
             </div>
           </form>
 
@@ -193,14 +193,14 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-primary" />
               </div>
-              <span className="font-medium">FLO's Response</span>
+              <span className="font-medium">Ivy's Response</span>
             </div>
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{answer}</p>
             </div>
             <div className="pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">
-                FLO provides general education and emotional support only. For anything medical or urgent, please contact your healthcare provider.
+                Ivy provides general education and emotional support only. For anything medical or urgent, please contact your healthcare provider.
               </p>
             </div>
           </div>

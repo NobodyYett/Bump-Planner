@@ -13,7 +13,7 @@ import { Share } from "@capacitor/share";
 // ============================================
 
 const DEFAULT_DURATION_MINUTES = 60;
-const PRODID = "-//Bump Planner//Appointments//EN";
+const PRODID = "-//Bloom//Appointments//EN";
 const CALSCALE = "GREGORIAN";
 const VERSION = "2.0";
 
@@ -138,7 +138,7 @@ export function generateIcsContent(appointment: CalendarAppointment): string {
   }
   
   // Description: minimal, no private medical info
-  lines.push(foldLine(`DESCRIPTION:${escapeIcsText("Created via Bump Planner")}`));
+  lines.push(foldLine(`DESCRIPTION:${escapeIcsText("Created via Bloom")}`));
   
   lines.push("END:VEVENT");
   lines.push("END:VCALENDAR");

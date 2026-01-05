@@ -50,7 +50,7 @@ function DeepLinkListener() {
       const fullUrl = event.url || "";
       if (!fullUrl) return;
 
-      if (!fullUrl.startsWith("com.bumpplanner.app://")) return;
+      if (!fullUrl.startsWith("com.zelkz.bloom://")) return;
       if (!fullUrl.includes("auth/callback")) return;
 
       if (isHandling.current) return;

@@ -10,18 +10,19 @@ const __dirname = path.dirname(__filename);
 
 // Apple App Site Association for Universal Links
 // This allows iOS to verify your app owns this domain
+// NOTE: Replace YOUR_TEAM_ID with your Apple Developer Team ID (found in Apple Developer Portal)
 const appleAppSiteAssociation = {
   applinks: {
     apps: [],
     details: [
       {
-        appID: "L7GQ6RN22C.com.bumpplanner.app",
+        appID: "YOUR_TEAM_ID.com.zelkz.bloom",
         paths: ["/auth/callback", "/auth/*", "/*"],
       },
     ],
   },
   webcredentials: {
-    apps: ["L7GQ6RN22C.com.bumpplanner.app"],
+    apps: ["YOUR_TEAM_ID.com.zelkz.bloom"],
   },
 };
 
