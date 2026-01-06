@@ -46,3 +46,4 @@ ios/**/xcshareddata/WorkspaceSettings.xcsettings
 # Duplicate xmls that should never be committed
 ios/**/config*.xml
 android/**/config*.xml
+bloom-review.zip
