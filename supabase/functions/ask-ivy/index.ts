@@ -26,10 +26,13 @@ const DAILY_LIMIT_FREE = 2;
 const DAILY_LIMIT_PREMIUM = 5;
 
 const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "*", // Required for Capacitor mobile apps
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// Note: CORS "*" is required for Capacitor apps which use capacitor://localhost (iOS)
+// and http://localhost (Android). The JWT auth check provides the real security.
 
 // ============================================
 // System Prompt (unchanged)

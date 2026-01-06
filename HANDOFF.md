@@ -1,4 +1,4 @@
-# Bump Planner — Handover Notes (Jan 2026)
+# Bloom — Handover Notes (Jan 2026)
 
 ## Current status
 - OAuth: stable on Capacitor 7 (avoid changing Capacitor major without re-testing OAuth)

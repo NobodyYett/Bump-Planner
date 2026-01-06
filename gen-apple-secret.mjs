@@ -3,7 +3,7 @@ import { SignJWT, importPKCS8 } from "jose";
 
 const TEAM_ID = "L7GQ6RN22C";
 const KEY_ID = "K5YH7GF7FU";
-const CLIENT_ID = "com.bumpplanner.app.web";
+const CLIENT_ID = "com.zelkz.bloom.web";
 
 // reads the key from one level up: ../AuthKey_K5YH7GF7FU.p8
 const p8PathUrl = new URL(`../AuthKey_${KEY_ID}.p8`, import.meta.url);

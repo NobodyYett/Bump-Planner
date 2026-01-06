@@ -115,7 +115,7 @@ export function generateIcsContent(appointment: CalendarAppointment): string {
   }
   
   const now = new Date();
-  const uid = `${appointment.id}@bump-planner`;
+  const uid = `${appointment.id}@bloom`;
   
   // Build ICS lines
   const lines: string[] = [
