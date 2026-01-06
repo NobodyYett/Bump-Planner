@@ -47,3 +47,6 @@ ios/**/xcshareddata/WorkspaceSettings.xcsettings
 ios/**/config*.xml
 android/**/config*.xml
 bloom-review.zip
+
+.gradle/
+.android/
