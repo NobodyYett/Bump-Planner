@@ -26,7 +26,7 @@ import SubscribePage from "@/pages/subscribe";
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PartnerProvider, usePartnerAccess } from "@/contexts/PartnerContext";
-import { PremiumProvider } from "@/contexts/PremiumContext";
+import { PremiumProvider, usePremium } from "@/contexts/PremiumContext";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
 import { supabase } from "./lib/supabase";
 
@@ -177,12 +177,21 @@ function AuthCallback() {
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, loading: authLoading } = useAuth();
-  const { isPartnerView, isLoading: partnerLoading } = usePartnerAccess();
+  const { isPartnerView, isLoading: partnerLoading, momIsPremium } = usePartnerAccess();
   const { isProfileLoading, isOnboardingComplete } = usePregnancyState();
   const [location, navigate] = useLocation();
+  
+  // Import premium context to check if partner themselves has premium
+  const { isPremium: currentUserIsPremium } = usePremium();
 
   // Check if we're on the /join page - special handling needed
   const isJoinPage = location.startsWith("/join") || window.location.pathname.startsWith("/join");
+  
+  // Check if we're on the /subscribe page - allow partners to see it
+  const isSubscribePage = location.startsWith("/subscribe") || window.location.pathname.startsWith("/subscribe");
+  
+  // Check if we're on the /settings page - allow partners to sign out
+  const isSettingsPage = location.startsWith("/settings") || window.location.pathname.startsWith("/settings");
 
   // Ensure profile exists - BUT NOT for partners OR users on /join page
   useEffect(() => {
@@ -242,7 +251,14 @@ function RequireAuth({ children }: { children: JSX.Element }) {
     }
 
     // Partners skip onboarding and profile checks
-    if (isPartnerView) return;
+    // Allow access if mom has premium OR if partner purchased premium themselves
+    if (isPartnerView) {
+      const hasAccess = momIsPremium || currentUserIsPremium;
+      if (!hasAccess && !isSubscribePage && !isSettingsPage) {
+        navigate("/subscribe", { replace: true });
+      }
+      return;
+    }
     
     // Users on /join page skip onboarding - they're becoming partners
     if (isJoinPage) return;

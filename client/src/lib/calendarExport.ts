@@ -189,7 +189,7 @@ function downloadIcsWeb(content: string, filename: string): void {
 /**
  * Share ICS file on mobile via share sheet
  */
-async function shareIcsMobile(content: string, filename: string): Promise<void> {
+async function shareIcsMobile(content: string, filename: string, title: string): Promise<void> {
   try {
     // Write to temporary file
     const result = await Filesystem.writeFile({
@@ -202,11 +202,12 @@ async function shareIcsMobile(content: string, filename: string): Promise<void> 
     // Get the file URI
     const fileUri = result.uri;
     
-    // Open share sheet
+    // Open share sheet with clear calendar-focused messaging
     await Share.share({
-      title: "Add to Calendar",
+      title: `Add "${title}" to Calendar`,
+      text: `Tap Calendar to add this appointment`,
       url: fileUri,
-      dialogTitle: "Add appointment to calendar",
+      dialogTitle: "Add to Calendar",
     });
     
     // Clean up temp file after a delay
@@ -237,14 +238,22 @@ async function shareIcsMobile(content: string, filename: string): Promise<void> 
  * Add appointment to calendar
  * - Web: Downloads .ics file
  * - Mobile: Opens share sheet with .ics file
+ * 
+ * Returns true if action was initiated successfully
  */
-export async function addToCalendar(appointment: CalendarAppointment): Promise<void> {
+export async function addToCalendar(appointment: CalendarAppointment): Promise<boolean> {
   const content = generateIcsContent(appointment);
   const filename = generateIcsFilename(appointment);
   
-  if (Capacitor.isNativePlatform()) {
-    await shareIcsMobile(content, filename);
-  } else {
-    downloadIcsWeb(content, filename);
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await shareIcsMobile(content, filename, appointment.title);
+    } else {
+      downloadIcsWeb(content, filename);
+    }
+    return true;
+  } catch (error) {
+    console.error("Calendar export failed:", error);
+    return false;
   }
 }

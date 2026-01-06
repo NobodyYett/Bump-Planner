@@ -133,13 +133,13 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
         <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-4">
           <form onSubmit={handleAsk} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">What would you like to ask?</label>
+              <label className="text-sm font-medium text-foreground">What would you like to ask?</label>
               <Textarea
                 placeholder="Example: Is it normal to feel more tired this week?"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 rows={4}
-                className="resize-none"
+                className="resize-none bg-background border-border"
                 disabled={limitReached}
               />
             </div>
@@ -149,13 +149,17 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
                 {remaining} of {dailyLimit} question{dailyLimit !== 1 ? "s" : ""} remaining today
               </span>
               {!isPaid && remaining === 0 && (
-                <Button variant="link" size="sm" className="text-primary p-0 h-auto">
+                <Button variant="link" size="sm" className="text-primary p-0 h-auto font-medium">
                   Upgrade for more
                 </Button>
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading || limitReached || !question.trim()}>
+            <Button 
+              type="submit" 
+              className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20" 
+              disabled={loading || limitReached || !question.trim()}
+            >
               {loading ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Ivy is thinking...</>
               ) : limitReached ? (
@@ -166,7 +170,7 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
             </Button>
 
             {/* Subtle micro-disclaimer */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground/80 bg-muted/50 rounded-lg p-3">
               <Info className="w-3.5 h-3.5 shrink-0" />
               <p>Ivy is here to support you — not replace medical care. If something feels urgent, contact your provider or emergency services.</p>
             </div>
@@ -190,13 +194,13 @@ Keep your tone warm, supportive, and calm. Avoid medical jargon.
         {answer && (
           <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-primary" />
               </div>
-              <span className="font-medium">Ivy's Response</span>
+              <span className="font-medium text-foreground">Ivy's Response</span>
             </div>
             <div className="prose prose-sm dark:prose-invert max-w-none">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{answer}</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{answer}</p>
             </div>
             <div className="pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">

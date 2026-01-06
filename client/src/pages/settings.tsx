@@ -1,6 +1,7 @@
 // client/src/pages/settings.tsx
 
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/hooks/useAuth";
 import { usePregnancyState, type BabySex } from "@/hooks/usePregnancyState";
@@ -14,7 +15,7 @@ import { format, differenceInDays } from "date-fns";
 import { 
   Loader2, Save, Trash2, AlertTriangle, Sun, Moon, Monitor, Bell, 
   Users, Copy, Check, Link2, Clock, Calendar, Lightbulb, ExternalLink,
-  HelpCircle, Mail, Bug, FileText, ChevronRight
+  HelpCircle, Mail, Bug, FileText, ChevronRight, Crown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme, type ThemeMode } from "@/theme/theme-provider";
@@ -53,6 +54,7 @@ function parseLocalDate(dateString: string): Date | null {
 export default function SettingsPage() {
   const { user, signOut, deleteAccount } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const { mode, setMode } = useTheme();
   const { isPartnerView, momName, hasActivePartner, refreshPartnerAccess } = usePartnerAccess();
 
@@ -100,7 +102,7 @@ export default function SettingsPage() {
   });
 
   // Premium subscription status
-  const { isPremium: isPaid } = usePremium();
+  const { isPremium: isPaid, canPurchase } = usePremium();
 
   const email = user?.email ?? "Unknown";
 
@@ -769,6 +771,52 @@ export default function SettingsPage() {
             </div>
           </section>
         )}
+
+        {/* Premium Subscription Section */}
+        <section className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border bg-muted/30">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Crown className="w-5 h-5" />
+              Subscription
+            </h2>
+          </div>
+          <div className="p-6">
+            {isPaid ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-sm font-medium">Bloom Premium Active</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  You have full access to all premium features including Partner View, detailed insights, and more Ivy questions.
+                </p>
+                {canPurchase && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLocation("/subscribe")}
+                    className="mt-2"
+                  >
+                    Manage Subscription
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Unlock Partner View, detailed weekly insights, smart task suggestions, and more.
+                </p>
+                <Button
+                  onClick={() => setLocation("/subscribe")}
+                  className="w-full"
+                >
+                  <Crown className="w-4 h-4 mr-2" />
+                  {canPurchase ? "Upgrade to Premium" : "View Premium Features"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* Help Section */}
         <section className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">

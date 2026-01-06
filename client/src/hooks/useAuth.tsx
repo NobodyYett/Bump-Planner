@@ -71,6 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    // Clear all bloom-related localStorage keys
+    const keysToRemove = Object.keys(localStorage).filter(
+      (key) => key.startsWith("bloom_") || key.startsWith("bump_") || key.startsWith("bump-")
+    );
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    
     await supabase.auth.signOut();
     setUser(null);
     window.location.href = "/login";

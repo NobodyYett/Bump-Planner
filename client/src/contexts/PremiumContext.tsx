@@ -12,6 +12,7 @@ import {
   ReactNode,
 } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 import {
   initializePurchases,
   getCustomerInfo,
@@ -39,6 +40,8 @@ interface PremiumContextValue {
   refreshEntitlement: () => Promise<void>;
   /** Whether we're on a native platform (can purchase) */
   canPurchase: boolean;
+  /** Sync premium status to Supabase (for server-side checks) */
+  syncPremiumToSupabase: (isPremium: boolean) => Promise<void>;
 }
 
 // ============================================
@@ -65,15 +68,62 @@ export function PremiumProvider({ children }: PremiumProviderProps) {
   
   const canPurchase = isNativePlatform();
 
+  // Sync premium status to Supabase for server-side enforcement (ask-ivy limits)
+  const syncPremiumToSupabase = useCallback(async (premium: boolean) => {
+    if (!user?.id) {
+      console.log("[Premium] Cannot sync - no user");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          is_premium: premium,
+          premium_updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "id" });
+
+      if (error) {
+        console.error("[Premium] Sync to Supabase failed:", error);
+      } else {
+        console.log("[Premium] Synced to Supabase: is_premium =", premium);
+      }
+    } catch (err) {
+      console.error("[Premium] Sync error:", err);
+    }
+  }, [user?.id]);
+
   // Update premium status from customer info
   const updatePremiumStatus = useCallback((info: CustomerInfo | null) => {
     setCustomerInfo(info);
-    setIsPremium(hasEntitlement(info, ENTITLEMENT_ID));
-  }, []);
+    const hasPremium = hasEntitlement(info, ENTITLEMENT_ID);
+    setIsPremium(hasPremium);
+    
+    // Auto-sync to Supabase when premium status changes
+    if (user?.id) {
+      syncPremiumToSupabase(hasPremium);
+    }
+  }, [user?.id, syncPremiumToSupabase]);
 
-  // Refresh entitlement from RevenueCat
+  // Refresh entitlement from RevenueCat (native) or Supabase (web)
   const refreshEntitlement = useCallback(async () => {
     if (!canPurchase) {
+      // Web: refresh from Supabase
+      if (user?.id) {
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("is_premium")
+            .eq("id", user.id)
+            .single();
+          
+          setIsPremium(data?.is_premium === true);
+        } catch (err) {
+          console.log("[Premium] Web refresh failed");
+        }
+      }
       setIsLoading(false);
       return;
     }
@@ -86,13 +136,29 @@ export function PremiumProvider({ children }: PremiumProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [canPurchase, updatePremiumStatus]);
+  }, [canPurchase, user?.id, updatePremiumStatus]);
 
-  // Initialize RevenueCat on mount
+  // Initialize RevenueCat on mount (native) or check Supabase (web)
   useEffect(() => {
     async function init() {
       if (!canPurchase) {
-        // Web: not premium, not loading
+        // Web: Check Supabase for premium status (purchased on mobile)
+        if (user?.id) {
+          try {
+            const { data } = await supabase
+              .from("profiles")
+              .select("is_premium")
+              .eq("id", user.id)
+              .single();
+            
+            if (data?.is_premium) {
+              setIsPremium(true);
+              console.log("[Premium] Web user has premium (from mobile purchase)");
+            }
+          } catch (err) {
+            console.log("[Premium] Could not check web premium status");
+          }
+        }
         setIsLoading(false);
         setInitialized(true);
         return;
@@ -107,7 +173,7 @@ export function PremiumProvider({ children }: PremiumProviderProps) {
     }
 
     init();
-  }, [canPurchase]);
+  }, [canPurchase, user?.id]);
 
   // Login/logout user when auth changes
   useEffect(() => {
@@ -162,6 +228,7 @@ export function PremiumProvider({ children }: PremiumProviderProps) {
     customerInfo,
     refreshEntitlement,
     canPurchase,
+    syncPremiumToSupabase,
   };
 
   return (

@@ -9,6 +9,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { usePregnancyState } from "@/hooks/usePregnancyState";
 import { usePremium } from "@/contexts/PremiumContext";
+import { usePartnerAccess } from "@/contexts/PartnerContext";
 import {
   getCurrentOffering,
   purchasePackage,
@@ -32,6 +33,7 @@ import { cn } from "@/lib/utils";
 export default function SubscribePage() {
   const { dueDate, setDueDate } = usePregnancyState();
   const { isPremium, canPurchase, refreshEntitlement } = usePremium();
+  const { isPartnerView, momName, momIsPremium } = usePartnerAccess();
   const [, setLocation] = useLocation();
 
   const [offering, setOffering] = useState<Offering | null>(null);
@@ -161,6 +163,184 @@ export default function SubscribePage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Partner paywall - show purchase option if neither mom nor partner has premium
+  const partnerHasAccess = isPremium || momIsPremium;
+  if (isPartnerView && !partnerHasAccess) {
+    // If can't purchase (web), show message only
+    if (!canPurchase) {
+      return (
+        <Layout dueDate={dueDate} setDueDate={setDueDate}>
+          <div className="max-w-lg mx-auto py-16 px-4 text-center">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-6">
+              <Users className="w-10 h-10 text-primary" />
+            </div>
+            <h1 className="font-serif text-3xl font-bold mb-3">
+              Partner Access Requires Premium
+            </h1>
+            <p className="text-muted-foreground mb-6">
+              {momName ? `${momName} needs` : "The mom needs"} to upgrade to Bloom Premium to unlock the partner experience.
+            </p>
+            <p className="text-sm text-muted-foreground mb-8">
+              To subscribe, please use the iOS or Android app.
+            </p>
+            <Button onClick={() => setLocation("/settings")} variant="outline">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Settings
+            </Button>
+          </div>
+        </Layout>
+      );
+    }
+    
+    // Native: Show full purchase flow for partner
+    return (
+      <Layout dueDate={dueDate} setDueDate={setDueDate}>
+        <div className="max-w-xl mx-auto py-8 px-4">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+              <Users className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="font-serif text-3xl font-bold mb-2">Unlock Partner Access</h1>
+            <p className="text-muted-foreground">
+              {momName ? `Subscribe to access ${momName}'s pregnancy journey` : "Subscribe to unlock the partner experience"}
+            </p>
+          </div>
+
+          {/* What you'll get */}
+          <div className="bg-card border border-border rounded-xl p-6 mb-6">
+            <h3 className="font-medium mb-4">With Premium, you'll be able to:</h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Check className="w-5 h-5 text-green-500" />
+                <span className="text-sm">See pregnancy updates and milestones</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Check className="w-5 h-5 text-green-500" />
+                <span className="text-sm">View upcoming appointments</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Check className="w-5 h-5 text-green-500" />
+                <span className="text-sm">Get personalized tips on how to support each week</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Check className="w-5 h-5 text-green-500" />
+                <span className="text-sm">Ask Ivy up to 5 questions per day</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Packages */}
+          {loadingOfferings ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : offering?.availablePackages && offering.availablePackages.length > 0 ? (
+            <div className="space-y-3 mb-6">
+              {offering.availablePackages.map((pkg) => (
+                <button
+                  key={pkg.identifier}
+                  onClick={() => setSelectedPackage(pkg)}
+                  className={cn(
+                    "w-full p-4 rounded-xl border-2 transition-all text-left",
+                    selectedPackage?.identifier === pkg.identifier
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{pkg.product.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {pkg.product.description}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold">{pkg.product.priceString}</p>
+                      {pkg.packageType === "MONTHLY" && (
+                        <p className="text-xs text-muted-foreground">per month</p>
+                      )}
+                      {pkg.packageType === "ANNUAL" && (
+                        <p className="text-xs text-muted-foreground">per year</p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-muted/50 border border-border rounded-xl p-6 text-center mb-6">
+              <p className="text-sm text-muted-foreground">
+                Subscription options are being set up. Please check back soon.
+              </p>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-4">
+              <p className="text-sm text-destructive text-center">{error}</p>
+            </div>
+          )}
+
+          {/* Purchase button */}
+          {selectedPackage && (
+            <Button
+              onClick={handlePurchase}
+              disabled={purchasing}
+              className="w-full h-12 text-base mb-4"
+              size="lg"
+            >
+              {purchasing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>Subscribe for {selectedPackage.product.priceString}</>
+              )}
+            </Button>
+          )}
+
+          {/* Restore purchases */}
+          <Button
+            onClick={handleRestore}
+            disabled={restoring}
+            variant="ghost"
+            className="w-full mb-4"
+          >
+            {restoring ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Restoring...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Restore Purchases
+              </>
+            )}
+          </Button>
+
+          {/* Legal text */}
+          <p className="text-xs text-muted-foreground text-center mb-4">
+            Payment will be charged to your App Store account. Subscription
+            automatically renews unless cancelled at least 24 hours before the end
+            of the current period.
+          </p>
+
+          {/* Back button */}
+          <div className="text-center">
+            <Button onClick={() => setLocation("/settings")} variant="link" className="text-muted-foreground">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Settings
+            </Button>
+          </div>
         </div>
       </Layout>
     );

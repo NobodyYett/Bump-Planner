@@ -28,6 +28,8 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { addToCalendar } from "@/lib/calendarExport";
+import { useToast } from "@/hooks/use-toast";
+import { Capacitor } from "@capacitor/core";
 
 type Appointment = {
   id: string;
@@ -41,6 +43,7 @@ export default function AppointmentsPage() {
   const { user } = useAuth();
   const { dueDate, setDueDate } = usePregnancyState();
   const { isPartnerView, momName } = usePartnerAccess();
+  const { toast } = useToast();
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [title, setTitle] = useState("");
@@ -51,6 +54,35 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(false);
   const [isSaving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  async function handleAddToCalendar(appointment: Appointment) {
+    const success = await addToCalendar({
+      id: appointment.id,
+      title: appointment.title,
+      starts_at: appointment.starts_at,
+      location: appointment.location,
+    });
+    
+    if (success) {
+      if (Capacitor.isNativePlatform()) {
+        toast({
+          title: "Share sheet opened",
+          description: "Tap Calendar to add this appointment.",
+        });
+      } else {
+        toast({
+          title: "Calendar file downloaded",
+          description: "Open the .ics file to add to your calendar.",
+        });
+      }
+    } else {
+      toast({
+        title: "Couldn't export",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -305,12 +337,7 @@ export default function AppointmentsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => addToCalendar({
-                          id: a.id,
-                          title: a.title,
-                          starts_at: a.starts_at,
-                          location: a.location,
-                        })}
+                        onClick={() => handleAddToCalendar(a)}
                       >
                         <CalendarPlus className="mr-2 h-4 w-4" />
                         Add to Calendar
@@ -381,12 +408,7 @@ export default function AppointmentsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => addToCalendar({
-                          id: a.id,
-                          title: a.title,
-                          starts_at: a.starts_at,
-                          location: a.location,
-                        })}
+                        onClick={() => handleAddToCalendar(a)}
                       >
                         <CalendarPlus className="mr-2 h-4 w-4" />
                         Add to Calendar
