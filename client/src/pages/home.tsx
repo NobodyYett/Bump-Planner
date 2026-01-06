@@ -52,14 +52,14 @@ export default function Home() {
   
   // Task suggestion setting (read from localStorage)
   const [showTaskSuggestions, setShowTaskSuggestions] = useState(() => {
-    const stored = localStorage.getItem("bumpplanner_show_task_suggestions");
+    const stored = localStorage.getItem("bloom_show_task_suggestions");
     return stored !== "false"; // Default: true
   });
   
   // Listen for changes from settings page
   useEffect(() => {
     function handleStorageChange() {
-      const stored = localStorage.getItem("bumpplanner_show_task_suggestions");
+      const stored = localStorage.getItem("bloom_show_task_suggestions");
       setShowTaskSuggestions(stored !== "false");
     }
     window.addEventListener("storage", handleStorageChange);

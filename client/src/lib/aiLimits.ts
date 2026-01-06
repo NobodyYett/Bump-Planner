@@ -1,6 +1,6 @@
 // client/src/lib/aiLimits.ts
 
-const STORAGE_KEY = "bump_ai_usage";
+const STORAGE_KEY = "bloom_ai_usage";
 
 interface AiUsageData {
   date: string;

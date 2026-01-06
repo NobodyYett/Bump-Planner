@@ -95,7 +95,7 @@ export default function SettingsPage() {
 
   // Task suggestions state
   const [taskSuggestionsEnabled, setTaskSuggestionsEnabled] = useState(() => {
-    const stored = localStorage.getItem("bumpplanner_show_task_suggestions");
+    const stored = localStorage.getItem("bloom_show_task_suggestions");
     return stored !== "false"; // Default: true
   });
 
@@ -265,7 +265,7 @@ export default function SettingsPage() {
 
   function handleTaskSuggestionsToggle(enabled: boolean) {
     setTaskSuggestionsEnabled(enabled);
-    localStorage.setItem("bumpplanner_show_task_suggestions", enabled ? "true" : "false");
+    localStorage.setItem("bloom_show_task_suggestions", enabled ? "true" : "false");
     window.dispatchEvent(new Event("taskSuggestionsChanged"));
     toast({
       title: enabled ? "Suggestions enabled" : "Suggestions disabled",

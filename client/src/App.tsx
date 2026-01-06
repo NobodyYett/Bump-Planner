@@ -8,6 +8,10 @@ import { App as CapApp, URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 
+// Run storage migration on load (one-time, for rebrand)
+import { migrateLocalStorage } from "./lib/storageMigration";
+migrateLocalStorage();
+
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Timeline from "@/pages/timeline";
@@ -246,7 +250,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
     if (isProfileLoading) return;
 
     if (user && !isOnboardingComplete) {
-      localStorage.removeItem("bump_skip_due");
+      localStorage.removeItem("bloom_skip_due");
       navigate("/onboarding", { replace: true });
       return;
     }

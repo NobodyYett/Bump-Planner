@@ -9,12 +9,12 @@ const EVENING_CHECKIN_ID = 8830;
 const APPOINTMENT_REMINDER_BASE_ID = 9000; // We'll add appointment id hash to this
 
 // Storage keys
-const MORNING_STORAGE_KEY = "bump_morning_checkin_enabled";
-const EVENING_STORAGE_KEY = "bump_evening_checkin_enabled";
-const APPOINTMENT_REMINDERS_KEY = "bump_appointment_reminders_enabled";
-const DEFAULT_REMINDER_TIMES_KEY = "bump_default_reminder_times";
-const LAST_MORNING_SENT_KEY = "bump_last_morning_sent";
-const LAST_EVENING_SENT_KEY = "bump_last_evening_sent";
+const MORNING_STORAGE_KEY = "bloom_morning_checkin_enabled";
+const EVENING_STORAGE_KEY = "bloom_evening_checkin_enabled";
+const APPOINTMENT_REMINDERS_KEY = "bloom_appointment_reminders_enabled";
+const DEFAULT_REMINDER_TIMES_KEY = "bloom_default_reminder_times";
+const LAST_MORNING_SENT_KEY = "bloom_last_morning_sent";
+const LAST_EVENING_SENT_KEY = "bloom_last_evening_sent";
 
 // Default reminder times (in minutes before appointment)
 export const DEFAULT_REMINDER_MINUTES = [1440, 60]; // 24 hours, 1 hour

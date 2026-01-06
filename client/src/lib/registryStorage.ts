@@ -7,7 +7,7 @@ export interface Registry {
   createdAt: string;
 }
 
-const STORAGE_KEY = "bump_registries";
+const STORAGE_KEY = "bloom_registries";
 
 function generateId(): string {
   return `reg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
