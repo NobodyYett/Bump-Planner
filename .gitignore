@@ -71,3 +71,13 @@ ios/App/Pods/
 android/.gradle/
 android/app/build/
 android/build/
+
+# --- archives / handoffs ---
+*.zip
+.zipignore
+
+# --- supabase temp ---
+supabase/.temp/
+
+# --- backups ---
+*.bak

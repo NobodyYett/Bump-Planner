@@ -1,5 +1,3 @@
-// client/src/components/layout.tsx
-
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -16,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { usePartnerAccess } from "@/contexts/PartnerContext";
 
@@ -24,30 +22,37 @@ interface LayoutProps {
   children: React.ReactNode;
   dueDate: Date | null;
   setDueDate: (date: Date | null) => void;
+  appMode?: "pregnancy" | "infancy";
+  babyBirthDate?: Date | null;
 }
 
-// Helper: parse "yyyy-MM-dd" as LOCAL date (not UTC)
 function parseLocalDate(dateString: string): Date {
   const [year, month, day] = dateString.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
-export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
+export function Layout({ children, dueDate, setDueDate, appMode = "pregnancy", babyBirthDate }: LayoutProps) {
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { user, signOut } = useAuth();
   const { isPartnerView, momName } = usePartnerAccess();
+
+  // Calculate days remaining for conditional nav item (pregnancy mode only)
+  const daysRemaining = dueDate ? differenceInDays(dueDate, new Date()) : null;
+  const showBabyArrivedNav = appMode === "pregnancy" && !isPartnerView && daysRemaining !== null && daysRemaining <= 30;
 
   const NavItem = ({
     href,
     icon: Icon,
     label,
     hidden = false,
+    highlight = false,
   }: {
     href: string;
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     label: string;
     hidden?: boolean;
+    highlight?: boolean;
   }) => {
     if (hidden) return null;
     
@@ -58,6 +63,8 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
             "flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 cursor-pointer",
             location === href
               ? "bg-primary/10 text-primary font-medium"
+              : highlight
+              ? "bg-primary/10 text-primary hover:bg-primary/20"
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
@@ -80,7 +87,6 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
           </span>
         </div>
         
-        {/* Partner mode indicator */}
         {isPartnerView && (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-xs font-medium mb-6">
             <Users className="w-3 h-3" />
@@ -88,53 +94,63 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
           </div>
         )}
 
-        {/* Main nav */}
         <nav className="space-y-1 mt-6">
           <NavItem href="/" icon={Heart} label="Today" />
-          <NavItem 
-            href="/timeline" 
-            icon={Calendar} 
-            label="Timeline" 
-            hidden={isPartnerView}
-          />
-          <NavItem 
-            href="/journal" 
-            icon={BookOpen} 
-            label="Journal" 
-            hidden={isPartnerView} 
-          />
+          <NavItem href="/timeline" icon={Calendar} label="Timeline" hidden={isPartnerView} />
+          <NavItem href="/journal" icon={BookOpen} label="Journal" hidden={isPartnerView} />
           <NavItem href="/appointments" icon={CalendarDays} label="Appointments" />
           <NavItem href="/settings" icon={Settings} label="Settings" />
         </nav>
       </div>
 
       <div className="mt-auto p-6 border-t border-sidebar-border space-y-4">
-        {/* Due date control - hidden for partners */}
         {!isPartnerView && (
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-              Due Date
-            </label>
-            <input
-              type="date"
-              className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-              value={dueDate ? format(dueDate, "yyyy-MM-dd") : ""}
-              onChange={(e) => {
-                const date = e.target.value ? parseLocalDate(e.target.value) : null;
-                setDueDate(date);
-              }}
-            />
+            {appMode === "infancy" ? (
+              /* INFANCY: Show birth date (read-only) */
+              <>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Birth Date
+                </label>
+                <div className="w-full px-3 py-2 rounded-md border border-input bg-muted/50 text-sm text-foreground">
+                  {babyBirthDate ? format(babyBirthDate, "MMMM d, yyyy") : "Not set"}
+                </div>
+              </>
+            ) : (
+              /* PREGNANCY: Show due date (editable) */
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Due Date
+                  </label>
+                  {showBabyArrivedNav && (
+                    <Link href="/baby-arrived">
+                      <span className="text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer">
+                        Baby arrived?
+                      </span>
+                    </Link>
+                  )}
+                </div>
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  value={dueDate ? format(dueDate, "yyyy-MM-dd") : ""}
+                  onChange={(e) => {
+                    const date = e.target.value ? parseLocalDate(e.target.value) : null;
+                    setDueDate(date);
+                  }}
+                />
+              </>
+            )}
           </div>
         )}
 
-        {/* Partner footer note */}
         {isPartnerView && (
           <div className="text-xs text-muted-foreground text-center py-2 px-3 rounded-lg bg-muted/50">
             Some personal details are only visible to {momName || "Mom"}.
           </div>
         )}
 
-        {/* User + Logout */}
         {user && (
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex-1 truncate text-muted-foreground">
@@ -160,18 +176,17 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Desktop Sidebar */}
       <div className="hidden md:block w-64 fixed inset-y-0 z-50">
         <SidebarContent />
       </div>
 
-      {/* Mobile Sidebar */}
       <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
         <SheetTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden fixed top-4 left-4 z-50"
+            className="md:hidden fixed left-4 z-50"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
           >
             <Menu className="w-6 h-6" />
           </Button>
@@ -181,7 +196,6 @@ export function Layout({ children, dueDate, setDueDate }: LayoutProps) {
         </SheetContent>
       </Sheet>
 
-      {/* Main Content */}
       <main className="flex-1 md:ml-64 relative">
         <div className="max-w-5xl mx-auto p-4 md:p-8 pt-16 md:pt-8 min-h-screen">
           {children}

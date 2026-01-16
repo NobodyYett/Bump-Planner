@@ -21,6 +21,8 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import generatedBg from "@/asset/soft_pastel_gradient_background_with_organic_shapes.png";
+import { FeedingTracker } from "@/components/feeding-tracker";
+import { useFeedingNotifications } from "@/hooks/useFeedingNotifications";
 
 type NextAppt = {
   id: string;
@@ -41,6 +43,10 @@ export default function Home() {
     setBabyName,
     momName,
     partnerName,
+    appMode,
+    babyBirthDate,
+    babyAgeWeeks,
+    babyAgeDays,
   } = usePregnancyState();
 
   const { user } = useAuth();
@@ -63,7 +69,6 @@ export default function Home() {
       setShowTaskSuggestions(stored !== "false");
     }
     window.addEventListener("storage", handleStorageChange);
-    // Also listen for custom event (same-tab updates)
     window.addEventListener("taskSuggestionsChanged", handleStorageChange);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
@@ -74,11 +79,17 @@ export default function Home() {
   // Premium subscription status
   const { isPremium: isPaid } = usePremium();
 
+  // Enable feeding notifications for infancy mode
+  useFeedingNotifications({ 
+    enabled: appMode === "infancy",
+    reminderEnabled: true 
+  });
+
   // Get today's check-ins for nudge + AI context (only for mom view)
   const todayDate = format(new Date(), "yyyy-MM-dd");
   const { data: todayLogs = [] } = useTodayLogs(todayDate);
 
-  // Extract check-in context for nudge (most recent check-in) - only used in mom view
+  // Extract check-in context for nudge
   const checkinContext = useMemo(() => {
     if (isPartnerView || todayLogs.length === 0) return null;
     
@@ -99,8 +110,9 @@ export default function Home() {
     setTempName(babyName ?? "");
   }, [babyName]);
 
+  // Hero title - same for both modes, just shows baby name
   const heroTitle =
-    !dueDate || currentWeek <= 0
+    !dueDate && appMode === "pregnancy"
       ? "Welcome"
       : babyName && babyName.trim().length > 0
       ? babyName.trim()
@@ -108,14 +120,27 @@ export default function Home() {
       ? "Baby Boy"
       : babySex === "girl"
       ? "Baby Girl"
+      : appMode === "infancy"
+      ? "Baby"
       : "Boy or Girl?";
 
-  const heroSubtitle =
-    currentWeek > 0 && daysRemaining > 0
-      ? `${daysRemaining} days to go! ${isPartnerView ? "You're in this together." : "You're doing amazing."}`
-      : currentWeek > 0 && daysRemaining <= 0
-      ? "The due date has arrived! Best wishes!"
-      : "Let's set your due date to start your journey.";
+  // Hero subtitle - different for pregnancy vs infancy
+  const heroSubtitle = useMemo(() => {
+    if (appMode === "infancy") {
+      return isPartnerView 
+        ? "You're in this together." 
+        : "You're doing amazing.";
+    }
+    
+    // Pregnancy mode
+    if (currentWeek > 0 && daysRemaining > 0) {
+      return `${daysRemaining} days to go! ${isPartnerView ? "You're in this together." : "You're doing amazing."}`;
+    }
+    if (currentWeek > 0 && daysRemaining <= 0) {
+      return "The due date has arrived! Best wishes!";
+    }
+    return "Let's set your due date to start your journey.";
+  }, [appMode, currentWeek, daysRemaining, isPartnerView]);
 
   // Build parent pills
   const parentPills = useMemo(() => {
@@ -162,8 +187,11 @@ export default function Home() {
     setEditingName(false);
   }
 
+  // Calculate effective week for components (pregnancy week OR baby age week)
+  const effectiveWeek = appMode === "infancy" ? babyAgeWeeks + 1 : currentWeek;
+
   return (
-    <Layout dueDate={dueDate} setDueDate={setDueDate}>
+    <Layout dueDate={dueDate} setDueDate={setDueDate} appMode={appMode} babyBirthDate={babyBirthDate}>
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* Hero Section */}
         <section className="relative rounded-3xl overflow-hidden p-10 md:p-14 text-white">
@@ -174,7 +202,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/10 z-10" />
 
           <div className="relative z-20 max-w-3xl">
-            {dueDate && currentWeek > 0 ? (
+            {(dueDate && currentWeek > 0) || appMode === "infancy" ? (
               <>
                 {/* Name editing - only for mom */}
                 {!isPartnerView && editingName ? (
@@ -192,18 +220,13 @@ export default function Home() {
                       <Button size="sm" onClick={handleSaveName}>
                         Save
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleCancelEdit}
-                      >
+                      <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
                         Cancel
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="mb-2">
-                    {/* Clickable for mom, static for partner */}
                     {isPartnerView ? (
                       <h1 className="font-serif text-6xl md:text-7xl font-bold drop-shadow-sm text-gray-800 tracking-tight">
                         {heroTitle}
@@ -261,12 +284,73 @@ export default function Home() {
           isPartnerView && "md:items-stretch"
         )}>
           <div className="md:col-span-2 space-y-8 flex flex-col">
-            <BabySizeDisplay currentWeek={currentWeek} />
+            {/* Baby Size/Model - pass appMode so it can show appropriate content */}
+            <BabySizeDisplay currentWeek={effectiveWeek} appMode={appMode} />
 
-            {/* Current Progress */}
+            {/* Progress (pregnancy) OR Age (infancy) */}
             <div className="bg-card rounded-xl p-6 border border-border shadow-sm space-y-4">
-              <WeekProgress currentWeek={currentWeek} />
+              {appMode === "infancy" ? (
+                /* INFANCY: Age display */
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground tracking-wide uppercase">
+                    Age
+                  </h3>
+                  <div className="flex items-baseline gap-2">
+                    {babyAgeWeeks === 0 ? (
+                      /* First week: show only days */
+                      <>
+                        <span className="text-4xl font-bold text-foreground">
+                          {babyAgeDays || 0}
+                        </span>
+                        <span className="text-lg text-muted-foreground">
+                          {babyAgeDays === 1 ? "day" : "days"}
+                        </span>
+                      </>
+                    ) : (
+                      /* After first week: show weeks and days */
+                      <>
+                        <span className="text-4xl font-bold text-foreground">
+                          {babyAgeWeeks}
+                        </span>
+                        <span className="text-lg text-muted-foreground">
+                          {babyAgeWeeks === 1 ? "week" : "weeks"}
+                        </span>
+                        {babyAgeDays > 0 && (
+                          <>
+                            <span className="text-2xl font-semibold text-foreground ml-2">
+                              {babyAgeDays}
+                            </span>
+                            <span className="text-base text-muted-foreground">
+                              {babyAgeDays === 1 ? "day" : "days"}
+                            </span>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {babyBirthDate && (
+                    <p className="text-xs text-muted-foreground">
+                      Born {format(babyBirthDate, "MMMM d, yyyy 'at' h:mm a")}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                /* PREGNANCY: Week progress */
+                <WeekProgress 
+                  currentWeek={currentWeek}
+                  subtextElement={
+                    !isPartnerView && dueDate && daysRemaining <= 30 ? (
+                      <Link href="/baby-arrived">
+                        <p className="text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer text-center mt-1">
+                          Baby arrived early? Tap here
+                        </p>
+                      </Link>
+                    ) : undefined
+                  }
+                />
+              )}
 
+              {/* Appointments - same for both modes */}
               <Link href="/appointments">
                 <div
                   className={cn(
@@ -309,10 +393,12 @@ export default function Home() {
                 isPaid={isPaid} 
                 checkinContext={checkinContext}
                 isPartnerView={false}
+                currentWeek={effectiveWeek}
+                appMode={appMode}
               />
             )}
 
-            {/* Registry for Partner - in left column, marks end of left column content */}
+            {/* Registry for Partner - in left column */}
             {isPartnerView && (
               <Registries isReadOnly={true} />
             )}
@@ -325,41 +411,51 @@ export default function Home() {
           )}>
             {/* Daily Check-in - only for mom */}
             {!isPartnerView && (
-              <DailyCheckIn currentWeek={currentWeek} />
+              <DailyCheckIn currentWeek={effectiveWeek} />
             )}
             
-            {/* "How She's Doing" card for partners - fills remaining height */}
+            {/* "How She's Doing" card for partners */}
             {isPartnerView && (
               <div className="h-full">
                 <WeeklySummary 
                   isPaid={isPaid} 
                   checkinContext={null}
                   isPartnerView={true}
-                  currentWeek={currentWeek}
+                  currentWeek={effectiveWeek}
                   trimester={trimester}
                   momName={partnerMomName}
                   hasUpcomingAppointment={!!nextAppt}
+                  appMode={appMode}
                 />
               </div>
             )}
           </div>
         </div>
 
-        {/* Weekly Wisdom - only for mom */}
-        {!isPartnerView && (
+        {/* Weekly Wisdom - AI-powered for both modes, mom only in pregnancy */}
+        {appMode === "infancy" ? (
+          /* INFANCY: Show WeeklyWisdom for both mom and partner */
           <WeeklyWisdom 
-            currentWeek={currentWeek} 
-            trimester={trimester} 
+            currentWeek={effectiveWeek} 
+            trimester={3}
             checkinContext={checkinContext}
+            appMode={appMode}
+            isPartnerView={isPartnerView}
           />
+        ) : (
+          /* PREGNANCY: Show WeeklyWisdom for mom only */
+          !isPartnerView && (
+            <WeeklyWisdom 
+              currentWeek={effectiveWeek} 
+              trimester={trimester} 
+              checkinContext={checkinContext}
+              appMode={appMode}
+              isPartnerView={false}
+            />
+          )
         )}
 
-        {/* Registries - full width for mom only */}
-        {!isPartnerView && (
-          <Registries isReadOnly={false} />
-        )}
-
-        {/* Shared Tasks - separate card for both views (after registries) */}
+        {/* Shared Tasks */}
         {(() => {
           const taskUserId = isPartnerView ? momUserId : user?.id;
           if (!taskUserId) return null;
@@ -367,13 +463,19 @@ export default function Home() {
             <SharedTasksCard
               momUserId={taskUserId}
               trimester={trimester}
-              currentWeek={currentWeek}
+              currentWeek={effectiveWeek}
               isPartnerView={isPartnerView}
               showSuggestions={showTaskSuggestions}
               isPaid={isPaid}
+              appMode={appMode}
             />
           );
         })()}
+
+        {/* Registries - full width for mom only, at bottom, minimized in infancy mode */}
+        {!isPartnerView && (
+          <Registries isReadOnly={appMode === "infancy"} />
+        )}
       </div>
     </Layout>
   );

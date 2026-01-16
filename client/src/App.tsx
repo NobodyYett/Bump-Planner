@@ -23,6 +23,7 @@ import Settings from "@/pages/settings";
 import AiPage from "@/pages/ai";
 import JoinPage from "@/pages/join";
 import SubscribePage from "@/pages/subscribe";
+import BabyArrived from "@/pages/baby-arrived";
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PartnerProvider, usePartnerAccess } from "@/contexts/PartnerContext";
@@ -372,6 +373,14 @@ function Router() {
         )}
       </Route>
 
+      <Route path="/baby-arrived">
+        {() => (
+          <RequireAuth>
+            <BabyArrived />
+          </RequireAuth>
+        )}
+      </Route>
+
       <Route path="/">
         {() => (
           <RequireAuth>
@@ -390,8 +399,8 @@ function Router() {
 export default function App() {
   return (
     <AuthProvider>
-      <PremiumProvider>
-        <PartnerProvider>
+      <PartnerProvider>
+        <PremiumProvider>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <DeepLinkListener />
@@ -399,8 +408,8 @@ export default function App() {
               <Router />
             </TooltipProvider>
           </QueryClientProvider>
-        </PartnerProvider>
-      </PremiumProvider>
+        </PremiumProvider>
+      </PartnerProvider>
     </AuthProvider>
   );
 }

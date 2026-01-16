@@ -1,7 +1,7 @@
 // client/src/pages/subscribe.tsx
 //
 // Subscription purchase page
-// Real RevenueCat integration for native, graceful fallback for web
+// Clean UI with single upgrade button
 
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -15,7 +15,6 @@ import {
   purchasePackage,
   restorePurchases,
   type Package,
-  type Offering,
 } from "@/lib/purchases";
 import {
   Sparkles,
@@ -25,26 +24,21 @@ import {
   ListTodo,
   Lightbulb,
   Loader2,
-  RefreshCw,
   ArrowLeft,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export default function SubscribePage() {
   const { dueDate, setDueDate } = usePregnancyState();
   const { isPremium, canPurchase, refreshEntitlement } = usePremium();
-  const { isPartnerView, momName, momIsPremium } = usePartnerAccess();
+  const { isPartnerView, momName } = usePartnerAccess();
   const [, setLocation] = useLocation();
 
-  const [offering, setOffering] = useState<Offering | null>(null);
-  const [loadingOfferings, setLoadingOfferings] = useState(true);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Feature list
-  const features = [
+  // Feature lists
+  const momFeatures = [
     {
       icon: <Users className="w-5 h-5" />,
       title: "Partner View",
@@ -67,37 +61,16 @@ export default function SubscribePage() {
     },
   ];
 
-  // Load offerings on mount (native only)
-  useEffect(() => {
-    async function loadOfferings() {
-      if (!canPurchase) {
-        setLoadingOfferings(false);
-        return;
-      }
-
-      try {
-        const currentOffering = await getCurrentOffering();
-        setOffering(currentOffering);
-        
-        // Auto-select first package (usually monthly)
-        if (currentOffering?.availablePackages?.[0]) {
-          setSelectedPackage(currentOffering.availablePackages[0]);
-        }
-      } catch (err) {
-        console.error("Failed to load offerings:", err);
-        setError("Unable to load subscription options");
-      } finally {
-        setLoadingOfferings(false);
-      }
-    }
-
-    loadOfferings();
-  }, [canPurchase]);
+  const partnerFeatures = [
+    "See pregnancy updates and milestones",
+    "View upcoming appointments",
+    "Get personalized tips on how to support each week",
+    "Ask Ivy up to 5 questions per day",
+  ];
 
   // Redirect if already premium
   useEffect(() => {
     if (isPremium) {
-      // Small delay to show success state
       const timer = setTimeout(() => {
         setLocation("/");
       }, 1500);
@@ -105,20 +78,50 @@ export default function SubscribePage() {
     }
   }, [isPremium, setLocation]);
 
-  // Handle purchase
+  // Handle purchase - fetches offering and purchases in one go
   async function handlePurchase() {
-    if (!selectedPackage || purchasing) return;
+    console.log("[Subscribe] handlePurchase called");
+    console.log("[Subscribe] purchasing:", purchasing, "canPurchase:", canPurchase);
+    
+    if (purchasing || !canPurchase) {
+      console.log("[Subscribe] Aborting - already purchasing or cannot purchase");
+      return;
+    }
 
     setPurchasing(true);
     setError(null);
 
-    const result = await purchasePackage(selectedPackage);
+    try {
+      // Get current offering
+      console.log("[Subscribe] Fetching current offering...");
+      const offering = await getCurrentOffering();
+      console.log("[Subscribe] Offering received:", offering);
+      
+      if (!offering?.availablePackages?.length) {
+        console.log("[Subscribe] No packages available in offering");
+        setError("Unable to load subscription. Please try again.");
+        setPurchasing(false);
+        return;
+      }
 
-    if (result.success) {
-      // Entitlement will be updated via listener, but refresh just in case
-      await refreshEntitlement();
-    } else if (result.error && result.error !== "cancelled") {
-      setError(result.error);
+      // Get first available package (monthly)
+      const pkg: Package = offering.availablePackages[0];
+      console.log("[Subscribe] Selected package:", pkg);
+      
+      console.log("[Subscribe] Calling purchasePackage...");
+      const result = await purchasePackage(pkg);
+      console.log("[Subscribe] Purchase result:", result);
+
+      if (result.success) {
+        console.log("[Subscribe] Purchase successful, refreshing entitlement");
+        await refreshEntitlement();
+      } else if (result.error && result.error !== "cancelled") {
+        console.log("[Subscribe] Purchase failed:", result.error);
+        setError(result.error);
+      }
+    } catch (err) {
+      console.error("[Subscribe] Purchase error:", err);
+      setError("Something went wrong. Please try again.");
     }
 
     setPurchasing(false);
@@ -126,12 +129,15 @@ export default function SubscribePage() {
 
   // Handle restore
   async function handleRestore() {
+    console.log("[Subscribe] handleRestore called");
     if (restoring) return;
 
     setRestoring(true);
     setError(null);
 
+    console.log("[Subscribe] Calling restorePurchases...");
     const result = await restorePurchases();
+    console.log("[Subscribe] Restore result:", result);
 
     if (result.success) {
       await refreshEntitlement();
@@ -168,36 +174,8 @@ export default function SubscribePage() {
     );
   }
 
-  // Partner paywall - show purchase option if neither mom nor partner has premium
-  const partnerHasAccess = isPremium || momIsPremium;
-  if (isPartnerView && !partnerHasAccess) {
-    // If can't purchase (web), show message only
-    if (!canPurchase) {
-      return (
-        <Layout dueDate={dueDate} setDueDate={setDueDate}>
-          <div className="max-w-lg mx-auto py-16 px-4 text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-6">
-              <Users className="w-10 h-10 text-primary" />
-            </div>
-            <h1 className="font-serif text-3xl font-bold mb-3">
-              Partner Access Requires Premium
-            </h1>
-            <p className="text-muted-foreground mb-6">
-              {momName ? `${momName} needs` : "The mom needs"} to upgrade to Bloom Premium to unlock the partner experience.
-            </p>
-            <p className="text-sm text-muted-foreground mb-8">
-              To subscribe, please use the iOS or Android app.
-            </p>
-            <Button onClick={() => setLocation("/settings")} variant="outline">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Settings
-            </Button>
-          </div>
-        </Layout>
-      );
-    }
-    
-    // Native: Show full purchase flow for partner
+  // Partner view
+  if (isPartnerView) {
     return (
       <Layout dueDate={dueDate} setDueDate={setDueDate}>
         <div className="max-w-xl mx-auto py-8 px-4">
@@ -212,74 +190,18 @@ export default function SubscribePage() {
             </p>
           </div>
 
-          {/* What you'll get */}
-          <div className="bg-card border border-border rounded-xl p-6 mb-6">
+          {/* Features */}
+          <div className="bg-card border border-border rounded-xl p-6 mb-8">
             <h3 className="font-medium mb-4">With Premium, you'll be able to:</h3>
             <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <Check className="w-5 h-5 text-green-500" />
-                <span className="text-sm">See pregnancy updates and milestones</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Check className="w-5 h-5 text-green-500" />
-                <span className="text-sm">View upcoming appointments</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Check className="w-5 h-5 text-green-500" />
-                <span className="text-sm">Get personalized tips on how to support each week</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Check className="w-5 h-5 text-green-500" />
-                <span className="text-sm">Ask Ivy up to 5 questions per day</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Packages */}
-          {loadingOfferings ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : offering?.availablePackages && offering.availablePackages.length > 0 ? (
-            <div className="space-y-3 mb-6">
-              {offering.availablePackages.map((pkg) => (
-                <button
-                  key={pkg.identifier}
-                  onClick={() => setSelectedPackage(pkg)}
-                  className={cn(
-                    "w-full p-4 rounded-xl border-2 transition-all text-left",
-                    selectedPackage?.identifier === pkg.identifier
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{pkg.product.title}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {pkg.product.description}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold">{pkg.product.priceString}</p>
-                      {pkg.packageType === "MONTHLY" && (
-                        <p className="text-xs text-muted-foreground">per month</p>
-                      )}
-                      {pkg.packageType === "ANNUAL" && (
-                        <p className="text-xs text-muted-foreground">per year</p>
-                      )}
-                    </div>
-                  </div>
-                </button>
+              {partnerFeatures.map((feature, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  <Check className="w-5 h-5 text-green-500 shrink-0" />
+                  <span className="text-sm">{feature}</span>
+                </div>
               ))}
             </div>
-          ) : (
-            <div className="bg-muted/50 border border-border rounded-xl p-6 text-center mb-6">
-              <p className="text-sm text-muted-foreground">
-                Subscription options are being set up. Please check back soon.
-              </p>
-            </div>
-          )}
+          </div>
 
           {/* Error */}
           {error && (
@@ -289,11 +211,11 @@ export default function SubscribePage() {
           )}
 
           {/* Purchase button */}
-          {selectedPackage && (
+          {canPurchase ? (
             <Button
               onClick={handlePurchase}
               disabled={purchasing}
-              className="w-full h-12 text-base mb-4"
+              className="w-full h-12 text-base mb-6"
               size="lg"
             >
               {purchasing ? (
@@ -302,40 +224,50 @@ export default function SubscribePage() {
                   Processing...
                 </>
               ) : (
-                <>Subscribe for {selectedPackage.product.priceString}</>
+                <>
+                  <Heart className="w-4 h-4 mr-2" />
+                  Upgrade to Premium
+                </>
               )}
             </Button>
+          ) : (
+            <div className="bg-muted/50 border border-border rounded-xl p-6 text-center mb-6">
+              <p className="text-sm text-muted-foreground">
+                To subscribe, please use the iOS or Android app.
+              </p>
+            </div>
           )}
 
-          {/* Restore purchases */}
-          <Button
-            onClick={handleRestore}
-            disabled={restoring}
-            variant="ghost"
-            className="w-full mb-4"
-          >
-            {restoring ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Restoring...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Restore Purchases
-              </>
+          {/* Footer links */}
+          <div className="text-center space-y-4">
+            {canPurchase && (
+              <button
+                onClick={handleRestore}
+                disabled={restoring}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {restoring ? "Restoring..." : "Restore Purchases"}
+              </button>
             )}
-          </Button>
+            
+            <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+              <button 
+                type="button"
+                onClick={() => window.open('/privacy.html', '_blank')} 
+                className="underline hover:text-foreground transition-colors"
+              >
+                Privacy Policy
+              </button>
+              <span>•</span>
+              <button 
+                type="button"
+                onClick={() => window.open('/terms.html', '_blank')} 
+                className="underline hover:text-foreground transition-colors"
+              >
+                Terms of Service
+              </button>
+            </div>
 
-          {/* Legal text */}
-          <p className="text-xs text-muted-foreground text-center mb-4">
-            Payment will be charged to your App Store account. Subscription
-            automatically renews unless cancelled at least 24 hours before the end
-            of the current period.
-          </p>
-
-          {/* Back button */}
-          <div className="text-center">
             <Button onClick={() => setLocation("/settings")} variant="link" className="text-muted-foreground">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Settings
@@ -346,57 +278,7 @@ export default function SubscribePage() {
     );
   }
 
-  // Web fallback (can't purchase)
-  if (!canPurchase) {
-    return (
-      <Layout dueDate={dueDate} setDueDate={setDueDate}>
-        <div className="max-w-xl mx-auto py-8 px-4">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-              <Heart className="w-8 h-8 text-primary" />
-            </div>
-            <h1 className="font-serif text-3xl font-bold mb-2">Bloom Premium</h1>
-            <p className="text-muted-foreground">
-              Everything you need to prepare together
-            </p>
-          </div>
-
-          {/* Features */}
-          <div className="bg-card border border-border rounded-xl p-6 mb-6">
-            <div className="space-y-5">
-              {features.map((feature, index) => (
-                <div key={index} className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary mt-0.5">
-                    {feature.icon}
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-semibold">{feature.title}</p>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {feature.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Web message */}
-          <div className="bg-muted/50 border border-border rounded-xl p-6 text-center">
-            <p className="text-sm text-muted-foreground mb-4">
-              Subscriptions are available on the iOS and Android apps.
-            </p>
-            <Button onClick={() => setLocation("/")} variant="outline">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Home
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Native purchase flow
+  // Mom view
   return (
     <Layout dueDate={dueDate} setDueDate={setDueDate}>
       <div className="max-w-xl mx-auto py-8 px-4">
@@ -407,14 +289,14 @@ export default function SubscribePage() {
           </div>
           <h1 className="font-serif text-3xl font-bold mb-2">Bloom Premium</h1>
           <p className="text-muted-foreground">
-            Everything you need to prepare together
+            Share your pregnancy journey with your partner
           </p>
         </div>
 
         {/* Features */}
-        <div className="bg-card border border-border rounded-xl p-6 mb-6">
+        <div className="bg-card border border-border rounded-xl p-6 mb-8">
           <div className="space-y-5">
-            {features.map((feature, index) => (
+            {momFeatures.map((feature, index) => (
               <div key={index} className="flex items-start gap-4">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary mt-0.5">
                   {feature.icon}
@@ -430,52 +312,6 @@ export default function SubscribePage() {
           </div>
         </div>
 
-        {/* Packages */}
-        {loadingOfferings ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : offering?.availablePackages && offering.availablePackages.length > 0 ? (
-          <div className="space-y-3 mb-6">
-            {offering.availablePackages.map((pkg) => (
-              <button
-                key={pkg.identifier}
-                onClick={() => setSelectedPackage(pkg)}
-                className={cn(
-                  "w-full p-4 rounded-xl border-2 transition-all text-left",
-                  selectedPackage?.identifier === pkg.identifier
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{pkg.product.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {pkg.product.description}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold">{pkg.product.priceString}</p>
-                    {pkg.packageType === "MONTHLY" && (
-                      <p className="text-xs text-muted-foreground">per month</p>
-                    )}
-                    {pkg.packageType === "ANNUAL" && (
-                      <p className="text-xs text-muted-foreground">per year</p>
-                    )}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-muted/50 border border-border rounded-xl p-6 text-center mb-6">
-            <p className="text-sm text-muted-foreground">
-              Subscription options are being set up. Please check back soon.
-            </p>
-          </div>
-        )}
-
         {/* Error */}
         {error && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-4">
@@ -484,11 +320,11 @@ export default function SubscribePage() {
         )}
 
         {/* Purchase button */}
-        {selectedPackage && (
+        {canPurchase ? (
           <Button
             onClick={handlePurchase}
             disabled={purchasing}
-            className="w-full h-12 text-base mb-4"
+            className="w-full h-12 text-base mb-6"
             size="lg"
           >
             {purchasing ? (
@@ -497,59 +333,50 @@ export default function SubscribePage() {
                 Processing...
               </>
             ) : (
-              <>Continue with {selectedPackage.product.priceString}</>
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Upgrade to Premium
+              </>
             )}
           </Button>
+        ) : (
+          <div className="bg-muted/50 border border-border rounded-xl p-6 text-center mb-6">
+            <p className="text-sm text-muted-foreground">
+              Subscriptions are available on the iOS and Android apps.
+            </p>
+          </div>
         )}
 
-        {/* Restore purchases */}
-        <Button
-          onClick={handleRestore}
-          disabled={restoring}
-          variant="ghost"
-          className="w-full mb-4"
-        >
-          {restoring ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Restoring...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Restore Purchases
-            </>
+        {/* Footer links */}
+        <div className="text-center space-y-4">
+          {canPurchase && (
+            <button
+              onClick={handleRestore}
+              disabled={restoring}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {restoring ? "Restoring..." : "Restore Purchases"}
+            </button>
           )}
-        </Button>
+          
+          <div className="flex justify-center gap-4 text-xs text-muted-foreground">
+            <button 
+              type="button"
+              onClick={() => window.open('/privacy.html', '_blank')} 
+              className="underline hover:text-foreground transition-colors"
+            >
+              Privacy Policy
+            </button>
+            <span>•</span>
+            <button 
+              type="button"
+              onClick={() => window.open('/terms.html', '_blank')} 
+              className="underline hover:text-foreground transition-colors"
+            >
+              Terms of Service
+            </button>
+          </div>
 
-        {/* Legal text */}
-        <p className="text-xs text-muted-foreground text-center">
-          Payment will be charged to your App Store account. Subscription
-          automatically renews unless cancelled at least 24 hours before the end
-          of the current period.
-        </p>
-
-        {/* Legal links - required by App Store */}
-        <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
-          <button 
-            type="button"
-            onClick={() => window.open('/privacy.html', '_blank')} 
-            className="underline hover:text-foreground transition-colors"
-          >
-            Privacy Policy
-          </button>
-          <span>•</span>
-          <button 
-            type="button"
-            onClick={() => window.open('/terms.html', '_blank')} 
-            className="underline hover:text-foreground transition-colors"
-          >
-            Terms of Service
-          </button>
-        </div>
-
-        {/* Back button */}
-        <div className="mt-6 text-center">
           <Button onClick={() => setLocation("/")} variant="link" className="text-muted-foreground">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home

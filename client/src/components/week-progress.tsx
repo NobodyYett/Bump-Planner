@@ -5,9 +5,12 @@ import { cn } from "@/lib/utils";
 
 interface WeekProgressProps {
   currentWeek: number;
+  rightElement?: React.ReactNode;
+  subtextElement?: React.ReactNode;
+  hideTitle?: boolean;
 }
 
-export function WeekProgress({ currentWeek }: WeekProgressProps) {
+export function WeekProgress({ currentWeek, rightElement, subtextElement, hideTitle = false }: WeekProgressProps) {
   // Clamp week between 1 and 40 for display
   const displayWeek = Math.max(1, Math.min(40, currentWeek));
   const weekData = getWeekData(displayWeek);
@@ -20,17 +23,31 @@ export function WeekProgress({ currentWeek }: WeekProgressProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end">
-        <div>
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Current Progress</h2>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="font-serif text-3xl font-bold text-foreground">Week {displayWeek}</span>
-            <span className="text-muted-foreground">of 40</span>
+      <div>
+        <div className="flex justify-between items-end gap-3">
+          {/* Left side: Progress label + Week number */}
+          <div>
+            {!hideTitle && (
+              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Current Progress</h2>
+            )}
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="font-serif text-3xl font-bold text-foreground">Week {displayWeek}</span>
+              <span className="text-muted-foreground">of 40</span>
+            </div>
+          </div>
+          
+          {/* Right side: Trimester badge */}
+          <div className={cn("px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap", trimesterColors[weekData.trimester])}>
+            Trimester {weekData.trimester}
           </div>
         </div>
-        <div className={cn("px-3 py-1 rounded-full text-xs font-semibold", trimesterColors[weekData.trimester])}>
-          Trimester {weekData.trimester}
-        </div>
+        
+        {/* Optional subtext element centered under week number */}
+        {subtextElement && (
+          <div className="mt-1" style={{ width: "180px", textAlign: "center" }}>
+            {subtextElement}
+          </div>
+        )}
       </div>
 
       {/* Progress Bar */}

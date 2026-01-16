@@ -367,11 +367,10 @@ export default function SettingsPage() {
                     When your baby arrives, tap below to celebrate and continue your journey with the Infancy Guide.
                   </p>
                   <Button
-                    className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                    variant="outline"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                     onClick={() => setLocation("/baby-arrived")}
                   >
-                    ✨ Baby is Here!
+                    Baby is Here!
                   </Button>
                 </div>
               )}
@@ -437,7 +436,7 @@ export default function SettingsPage() {
             {isPaid ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <div className="w-2 h-2 rounded-full bg-primary" />
                   <span className="text-sm font-medium">Bloom Premium Active</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -510,7 +509,7 @@ export default function SettingsPage() {
             </a>
           </nav>
           <p className="text-xs text-muted-foreground/60">
-            Bloom v1.0.0 · Made with 💚 by Zelkz
+            Bloom v1.0.0 · Made with love by Zelkz
           </p>
         </footer>
       </div>

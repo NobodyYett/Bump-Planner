@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getNudgeForCheckin, isNudgeCompleted, markNudgeCompleted, type CheckinContext } from "@/lib/nudges";
+import { getInfancyMomTip } from "@/lib/infancy-data";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PremiumLock } from "@/components/premium-lock";
 
@@ -19,6 +20,7 @@ interface WeeklySummaryProps {
   trimester?: 1 | 2 | 3;
   momName?: string | null;
   hasUpcomingAppointment?: boolean;
+  appMode?: "pregnancy" | "infancy";
 }
 
 type Mood = "happy" | "neutral" | "sad";
@@ -117,7 +119,7 @@ function getMoodLabel(mood: Mood): string {
 }
 
 const moodIcons: Record<Mood, React.ReactNode> = {
-  happy: <Smile className="w-4 h-4 text-green-600 dark:text-green-400" />,
+  happy: <Smile className="w-4 h-4 text-primary dark:text-primary" />,
   neutral: <Meh className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />,
   sad: <Frown className="w-4 h-4 text-red-600 dark:text-red-400" />,
 };
@@ -216,12 +218,16 @@ export function WeeklySummary({
   trimester = 2,
   momName = null,
   hasUpcomingAppointment = false,
+  appMode = "pregnancy",
 }: WeeklySummaryProps) {
   const { data: weekLogs = [], isLoading } = useWeekLogs();
   const stats = useMemo(() => analyzeWeekLogs(weekLogs), [weekLogs]);
 
   const [nudgeCompleted, setNudgeCompleted] = useState(false);
   const nudge = getNudgeForCheckin(checkinContext);
+  
+  // Get "For You" tip for infancy mode
+  const forYouTip = appMode === "infancy" ? getInfancyMomTip(currentWeek) : null;
 
   useEffect(() => {
     if (!isPartnerView) {
@@ -343,7 +349,7 @@ export function WeeklySummary({
                   <div className="flex items-center gap-1.5">
                     <Zap className={cn(
                       "w-4 h-4",
-                      stats.dominantEnergy === "high" ? "text-green-500" :
+                      stats.dominantEnergy === "high" ? "text-primary" :
                       stats.dominantEnergy === "medium" ? "text-yellow-500" : "text-red-500"
                     )} />
                     <span className="text-sm font-semibold capitalize">
@@ -407,89 +413,110 @@ export function WeeklySummary({
 
   // MOM VIEW
   return (
-    <section className="bg-card rounded-xl p-6 border border-border shadow-sm">
-      {/* Today's Gentle Nudge - FIXED: nudge.message instead of nudge */}
-      {!nudgeCompleted && nudge && (
-        <div className="flex items-start gap-3 pb-4 mb-4 border-b border-border">
-          <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
-            <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Today's gentle nudge</p>
-            <p className="text-sm text-foreground">{nudge.message}</p>
-          </div>
-          <Checkbox
-            checked={nudgeCompleted}
-            onCheckedChange={handleNudgeToggle}
-            className="mt-1"
-          />
-        </div>
-      )}
-
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-          <BarChart3 className="w-4 h-4 text-primary" />
-        </div>
-        <div>
-          <h2 className="font-medium text-sm">Your Week at a Glance</h2>
-          <p className="text-xs text-muted-foreground">
-            {hasWeekData 
-              ? `${stats.totalCheckins} check-in${stats.totalCheckins !== 1 ? "s" : ""} over the last 7 days`
-              : "Start checking in to see your week"
-            }
-          </p>
-        </div>
-      </div>
-
-      {hasWeekData && (
-        <>
-          <p className="text-sm text-foreground leading-relaxed mb-4">{freeRecap}</p>
-
-          {/* Detailed stats - Premium feature */}
-          <PremiumLock isPaid={isPaid} showBadge={true}>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-muted/50 rounded-lg p-3">
-                <div className="text-xs text-muted-foreground mb-2">Mood</div>
-                <div className="flex items-center gap-1.5">
-                  {(["happy", "neutral", "sad"] as Mood[]).map((mood) => (
-                    <div key={mood} className="flex items-center gap-0.5">
-                      {moodIcons[mood]}
-                      <span className="text-xs font-medium">{stats.moodCounts[mood]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-muted/50 rounded-lg p-3">
-                <div className="text-xs text-muted-foreground mb-2">Top symptom</div>
-                <div className="text-sm font-medium truncate">
-                  {stats.topSymptoms[0] || "None"}
-                </div>
-              </div>
-
-              <div className="bg-muted/50 rounded-lg p-3">
-                <div className="text-xs text-muted-foreground mb-2">Energy</div>
-                <div className="flex items-center gap-1">
-                  <Zap className={cn(
-                    "w-4 h-4",
-                    stats.dominantEnergy === "high" ? "text-green-500" :
-                    stats.dominantEnergy === "medium" ? "text-yellow-500" : "text-red-500"
-                  )} />
-                  <span className="text-sm font-medium capitalize">
-                    {stats.dominantEnergy || "—"}
-                  </span>
-                </div>
-              </div>
+    <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      {/* For You tip (infancy) or Gentle Nudge (pregnancy) */}
+      {appMode === "infancy" && forYouTip ? (
+        /* INFANCY: Show "For You" tip - regular styling */
+        <div className="px-6 py-5 border-b border-border">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Heart className="w-4 h-4 text-primary" />
             </div>
-          </PremiumLock>
-        </>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-muted-foreground mb-1">For You</p>
+              <p className="text-sm text-foreground leading-relaxed">{forYouTip}</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* PREGNANCY: Show gentle nudge */
+        !nudgeCompleted && nudge && (
+          <div className="px-6 py-5 border-b border-border">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Today's gentle nudge</p>
+                <p className="text-sm text-foreground">{nudge.message}</p>
+              </div>
+              <Checkbox
+                checked={nudgeCompleted}
+                onCheckedChange={handleNudgeToggle}
+                className="mt-1"
+              />
+            </div>
+          </div>
+        )
       )}
 
-      {!hasWeekData && !isLoading && (
-        <p className="text-sm text-muted-foreground">
-          Check in daily to see patterns in your mood, energy, and symptoms.
-        </p>
-      )}
+      {/* BOTTOM HALF - Your Week at a Glance */}
+      <div className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <BarChart3 className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-medium text-sm">Your Week at a Glance</h2>
+            <p className="text-xs text-muted-foreground">
+              {hasWeekData 
+                ? `${stats.totalCheckins} check-in${stats.totalCheckins !== 1 ? "s" : ""} over the last 7 days`
+                : "Start checking in to see your week"
+              }
+            </p>
+          </div>
+        </div>
+
+        {hasWeekData && (
+          <>
+            <p className="text-sm text-foreground leading-relaxed mb-4">{freeRecap}</p>
+
+            {/* Detailed stats - Premium feature */}
+            <PremiumLock isPaid={isPaid} showBadge={true}>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="text-xs text-muted-foreground mb-2">Mood</div>
+                  <div className="flex items-center gap-1.5">
+                    {(["happy", "neutral", "sad"] as Mood[]).map((mood) => (
+                      <div key={mood} className="flex items-center gap-0.5">
+                        {moodIcons[mood]}
+                        <span className="text-xs font-medium">{stats.moodCounts[mood]}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="text-xs text-muted-foreground mb-2">Top symptom</div>
+                  <div className="text-sm font-medium truncate">
+                    {stats.topSymptoms[0] || "None"}
+                  </div>
+                </div>
+
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="text-xs text-muted-foreground mb-2">Energy</div>
+                  <div className="flex items-center gap-1">
+                    <Zap className={cn(
+                      "w-4 h-4",
+                      stats.dominantEnergy === "high" ? "text-primary" :
+                      stats.dominantEnergy === "medium" ? "text-yellow-500" : "text-red-500"
+                    )} />
+                    <span className="text-sm font-medium capitalize">
+                      {stats.dominantEnergy || "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </PremiumLock>
+          </>
+        )}
+
+        {!hasWeekData && !isLoading && (
+          <p className="text-sm text-muted-foreground">
+            Check in daily to see patterns in your mood, energy, and symptoms.
+          </p>
+        )}
+      </div>
     </section>
   );
 }

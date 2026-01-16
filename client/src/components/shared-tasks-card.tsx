@@ -1,13 +1,32 @@
 // client/src/components/shared-tasks-card.tsx
 
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, CheckCircle2, Circle, ListTodo, Lightbulb, Sparkles } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, Circle, ListTodo, Lightbulb, Sparkles, Baby, Moon, Milk, FlaskConical, ChevronLeft, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { PremiumLock } from "@/components/premium-lock";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  useCreateFeeding, 
+  useLastFeeding,
+  formatTimeSinceFeeding,
+  getFeedingEmoji,
+  getSideLabel,
+  type FeedingType,
+  type BreastSide 
+} from "@/hooks/useFeedingLogs";
+import { 
+  useCreateNap, 
+  useLastNap,
+  formatTimeSinceNap 
+} from "@/hooks/useNapLogs";
+import {
+  useFeedingInsights,
+  formatMinutesToReadable,
+} from "@/hooks/useFeedingInsights";
 
 interface SharedTask {
   id: string;
@@ -24,6 +43,7 @@ interface SharedTasksCardProps {
   isPartnerView?: boolean;
   showSuggestions?: boolean;  // Default: true
   isPaid?: boolean;           // Premium subscription status
+  appMode?: "pregnancy" | "infancy";  // Mode for appropriate suggestions
 }
 
 // Smart task suggestions based on current week
@@ -36,7 +56,8 @@ interface TaskSuggestion {
 
 function getSmartSuggestions(
   currentWeek: number,
-  existingTasks: SharedTask[]
+  existingTasks: SharedTask[],
+  appMode: "pregnancy" | "infancy" = "pregnancy"
 ): TaskSuggestion[] {
   const existingTitles = existingTasks.map(t => t.title.toLowerCase());
   const suggestions: TaskSuggestion[] = [];
@@ -46,6 +67,104 @@ function getSmartSuggestions(
     existingTitles.some(title => 
       keywords.some(kw => title.includes(kw.toLowerCase()))
     );
+
+  // ========== INFANCY MODE ==========
+  if (appMode === "infancy") {
+    // Week 1-2: Immediate newborn care
+    if (currentWeek <= 2) {
+      if (!hasTask(["pediatrician", "doctor", "checkup", "appointment"])) {
+        suggestions.push({
+          title: "Schedule first pediatrician visit",
+          priority: "high",
+          reason: "Usually needed within 3-5 days",
+        });
+      }
+      if (!hasTask(["birth certificate", "certificate", "vital records"])) {
+        suggestions.push({
+          title: "File for birth certificate",
+          priority: "high",
+          reason: "Start the paperwork early",
+        });
+      }
+      if (!hasTask(["social security", "ssn", "ss card"])) {
+        suggestions.push({
+          title: "Apply for Social Security card",
+          priority: "medium",
+          reason: "Needed for insurance and taxes",
+        });
+      }
+    }
+    
+    // Week 2-4: Getting settled
+    if (currentWeek >= 2 && currentWeek <= 4) {
+      if (!hasTask(["thank you", "thank-you", "notes", "gifts"])) {
+        suggestions.push({
+          title: "Send thank you notes",
+          priority: "low",
+          reason: "For baby gifts and meal deliveries",
+        });
+      }
+      if (!hasTask(["insurance", "add baby", "dependent", "coverage"])) {
+        suggestions.push({
+          title: "Add baby to health insurance",
+          priority: "high",
+          reason: "Usually 30-day deadline from birth",
+        });
+      }
+    }
+    
+    // Week 4-8: Establishing routines
+    if (currentWeek >= 4 && currentWeek <= 8) {
+      if (!hasTask(["tummy time", "tummy"])) {
+        suggestions.push({
+          title: "Start regular tummy time",
+          priority: "medium",
+          reason: "Builds neck and core strength",
+        });
+      }
+      if (!hasTask(["postpartum", "checkup", "6 week", "ob"])) {
+        suggestions.push({
+          title: "Schedule postpartum checkup",
+          priority: "high",
+          reason: "Typically at 6 weeks postpartum",
+        });
+      }
+    }
+    
+    // Week 6-12: Looking ahead
+    if (currentWeek >= 6) {
+      if (!hasTask(["childcare", "daycare", "nanny", "care"])) {
+        suggestions.push({
+          title: "Research childcare options",
+          priority: "medium",
+          reason: "Waitlists can be long",
+        });
+      }
+      if (!hasTask(["photos", "newborn photos", "photography"])) {
+        suggestions.push({
+          title: "Schedule newborn photos",
+          priority: "low",
+          reason: "Best in first 2 weeks, but still lovely later",
+        });
+      }
+    }
+    
+    if (currentWeek >= 8) {
+      if (!hasTask(["vaccine", "vaccination", "immunization", "shots"])) {
+        suggestions.push({
+          title: "Check baby's vaccination schedule",
+          priority: "medium",
+          reason: "2-month vaccines coming up",
+        });
+      }
+    }
+
+    // Sort and return
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    return suggestions
+      .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+      .slice(0, 3);
+  }
 
   // ========== FIRST TRIMESTER (Weeks 1-13) ==========
   if (currentWeek <= 13) {
@@ -212,7 +331,28 @@ function getSmartSuggestions(
 }
 
 // Sample suggestions for free users (always visible, shows value of premium)
-function getSampleSuggestions(currentWeek: number): TaskSuggestion[] {
+function getSampleSuggestions(currentWeek: number, appMode: "pregnancy" | "infancy" = "pregnancy"): TaskSuggestion[] {
+  // Infancy mode samples
+  if (appMode === "infancy") {
+    if (currentWeek <= 2) {
+      return [
+        { title: "Schedule first pediatrician visit", priority: "high", reason: "Usually needed within 3-5 days" },
+        { title: "File for birth certificate", priority: "high", reason: "Start the paperwork early" },
+      ];
+    } else if (currentWeek <= 6) {
+      return [
+        { title: "Add baby to health insurance", priority: "high", reason: "Usually 30-day deadline" },
+        { title: "Schedule postpartum checkup", priority: "medium", reason: "Typically at 6 weeks" },
+      ];
+    } else {
+      return [
+        { title: "Research childcare options", priority: "medium", reason: "Waitlists can be long" },
+        { title: "Check vaccination schedule", priority: "medium", reason: "2-month vaccines coming up" },
+      ];
+    }
+  }
+
+  // Pregnancy mode samples (original)
   if (currentWeek < 14) {
     return [
       { title: "Schedule first prenatal visit", priority: "high", reason: "Important for early care" },
@@ -231,13 +371,75 @@ function getSampleSuggestions(currentWeek: number): TaskSuggestion[] {
   }
 }
 
-export function SharedTasksCard({ momUserId, trimester, currentWeek, isPartnerView = false, showSuggestions = true, isPaid = false }: SharedTasksCardProps) {
+export function SharedTasksCard({ 
+  momUserId, 
+  trimester, 
+  currentWeek, 
+  isPartnerView = false, 
+  showSuggestions = true, 
+  isPaid = false, 
+  appMode = "pregnancy"
+}: SharedTasksCardProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<SharedTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [tableExists, setTableExists] = useState(true);
+  
+  // Feeding & Nap hooks for infancy mode
+  const createFeeding = useCreateFeeding();
+  const createNap = useCreateNap();
+  const { data: lastFeeding } = useLastFeeding();
+  const { data: lastNap } = useLastNap();
+  const { data: feedingInsights } = useFeedingInsights();
+  
+  // UI state for multi-step selections
+  type QuickLogStep = null | "breast-side" | "bottle-type" | "nap-duration";
+  const [quickLogStep, setQuickLogStep] = useState<QuickLogStep>(null);
+  const [selectedNapDuration, setSelectedNapDuration] = useState<number>(30);
+  
+  // Quick log handlers
+  async function handleLogFeeding(type: FeedingType, side?: BreastSide) {
+    try {
+      await createFeeding.mutateAsync({ type, side, fed_at: new Date() });
+      const sideText = side ? ` (${getSideLabel(side)})` : "";
+      toast({
+        title: "Feeding logged",
+        description: `${getFeedingEmoji(type)} ${type}${sideText}`,
+      });
+      setQuickLogStep(null);
+    } catch (err) {
+      console.error("Failed to log feeding:", err);
+      toast({
+        title: "Couldn't save",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
+  
+  async function handleLogNap(duration: number) {
+    try {
+      await createNap.mutateAsync({ duration_minutes: duration });
+      toast({
+        title: "Nap logged",
+        description: `😴 ${duration} min nap recorded`,
+      });
+      setQuickLogStep(null);
+      setSelectedNapDuration(30);
+    } catch (err) {
+      console.error("Failed to log nap:", err);
+      toast({
+        title: "Couldn't save",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
+  
+  const isLoggingBusy = createFeeding.isPending || createNap.isPending;
 
   // Get smart suggestions based on week and existing tasks
   // For free users: always show sample suggestions (for locked preview)
@@ -246,12 +448,12 @@ export function SharedTasksCard({ momUserId, trimester, currentWeek, isPartnerVi
     () => {
       // For free users, always show sample suggestions (unfiltered) so they see the value
       if (!isPaid) {
-        return getSampleSuggestions(currentWeek);
+        return getSampleSuggestions(currentWeek, appMode);
       }
       // For paid users, respect the toggle setting and filter out existing tasks
-      return showSuggestions ? getSmartSuggestions(currentWeek, tasks) : [];
+      return showSuggestions ? getSmartSuggestions(currentWeek, tasks, appMode) : [];
     },
-    [currentWeek, tasks, showSuggestions, isPaid]
+    [currentWeek, tasks, showSuggestions, isPaid, appMode]
   );
 
   // Fetch tasks
@@ -428,6 +630,229 @@ export function SharedTasksCard({ momUserId, trimester, currentWeek, isPartnerVi
 
       {/* Content */}
       <div className="p-6">
+        {/* Quick Actions for Infancy Mode */}
+        {appMode === "infancy" && (
+          <div className="mb-4 pb-4 border-b border-border">
+            {/* Today's Summary */}
+            {feedingInsights && (feedingInsights.todayFeedingCount > 0 || feedingInsights.todayNapCount > 0) && (
+              <div className="mb-4 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                <p className="text-xs font-medium text-primary mb-2">Today's Summary</p>
+                <div className="space-y-2">
+                  {/* Feedings row */}
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <Baby className="w-4 h-4 text-pink-500" />
+                      <span className="font-medium">{feedingInsights.todayFeedingCount}</span>
+                      <span className="text-muted-foreground">feedings</span>
+                    </div>
+                    {lastFeeding && (
+                      <span className="text-xs text-muted-foreground">
+                        Last: {formatTimeSinceFeeding(lastFeeding.fed_at)}
+                      </span>
+                    )}
+                  </div>
+                  {/* Naps row */}
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <Moon className="w-4 h-4 text-indigo-500" />
+                      <span className="font-medium">
+                        {feedingInsights.todayTotalNapMinutes > 0 
+                          ? formatMinutesToReadable(feedingInsights.todayTotalNapMinutes)
+                          : "0m"
+                        }
+                      </span>
+                      <span className="text-muted-foreground">naps</span>
+                    </div>
+                    {lastNap && (
+                      <span className="text-xs text-muted-foreground">
+                        Last: {formatTimeSinceNap(lastNap.started_at)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Patterns */}
+                {feedingInsights.avgTimeBetweenFeedings && (
+                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-primary/10">
+                    {feedingInsights.feedingPatternText}
+                  </p>
+                )}
+                {/* Next feeding suggestion */}
+                {feedingInsights.suggestedNextFeedingIn !== null && feedingInsights.suggestedNextFeedingIn <= 30 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {feedingInsights.suggestedNextFeedingIn <= 0 
+                      ? "Feeding may be due soon"
+                      : `Next feeding in ~${feedingInsights.suggestedNextFeedingIn}m`
+                    }
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs font-medium text-muted-foreground mb-3">Quick Log</p>
+            
+            {quickLogStep === null ? (
+              /* Main buttons */
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-10"
+                    onClick={() => setQuickLogStep("breast-side")}
+                    disabled={isLoggingBusy}
+                  >
+                    <Baby className="w-4 h-4 mr-1.5 text-pink-500" />
+                    Breast
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-10"
+                    onClick={() => setQuickLogStep("bottle-type")}
+                    disabled={isLoggingBusy}
+                  >
+                    <Milk className="w-4 h-4 mr-1.5 text-blue-500" />
+                    Bottle
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-10 justify-center"
+                  onClick={() => setQuickLogStep("nap-duration")}
+                  disabled={isLoggingBusy}
+                >
+                  <Moon className="w-4 h-4 mr-2 text-indigo-500" />
+                  Log Nap
+                </Button>
+              </div>
+            ) : quickLogStep === "breast-side" ? (
+              /* Breast side selection */
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuickLogStep(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                    disabled={isLoggingBusy}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs text-muted-foreground">Which side?</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-10"
+                    onClick={() => handleLogFeeding("breast", "left")}
+                    disabled={isLoggingBusy}
+                  >
+                    Left
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-10"
+                    onClick={() => handleLogFeeding("breast", "right")}
+                    disabled={isLoggingBusy}
+                  >
+                    Right
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-10"
+                    onClick={() => handleLogFeeding("breast", "both")}
+                    disabled={isLoggingBusy}
+                  >
+                    Both
+                  </Button>
+                </div>
+              </div>
+            ) : quickLogStep === "bottle-type" ? (
+              /* Bottle type selection - formula or breast milk */
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuickLogStep(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                    disabled={isLoggingBusy}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs text-muted-foreground">What's in the bottle?</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-10"
+                    onClick={() => handleLogFeeding("bottle")}
+                    disabled={isLoggingBusy}
+                  >
+                    <Milk className="w-4 h-4 mr-1.5 text-blue-500" />
+                    Breast Milk
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-10"
+                    onClick={() => handleLogFeeding("formula")}
+                    disabled={isLoggingBusy}
+                  >
+                    <FlaskConical className="w-4 h-4 mr-1.5 text-purple-500" />
+                    Formula
+                  </Button>
+                </div>
+              </div>
+            ) : quickLogStep === "nap-duration" ? (
+              /* Nap duration selection */
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuickLogStep(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                    disabled={isLoggingBusy}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs text-muted-foreground">How long was the nap?</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[15, 30, 45, 60, 90, 120].map((mins) => (
+                    <button
+                      key={mins}
+                      onClick={() => setSelectedNapDuration(mins)}
+                      className={cn(
+                        "px-3 py-2 rounded-md text-sm border transition-colors",
+                        selectedNapDuration === mins
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-border hover:bg-muted"
+                      )}
+                      disabled={isLoggingBusy}
+                    >
+                      {mins < 60 ? `${mins}m` : `${mins / 60}h`}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full h-10"
+                  onClick={() => handleLogNap(selectedNapDuration)}
+                  disabled={isLoggingBusy}
+                >
+                  <Moon className="w-4 h-4 mr-2" />
+                  Log {selectedNapDuration < 60 ? `${selectedNapDuration}m` : `${selectedNapDuration / 60}h`} Nap
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         <div className="space-y-4">
           {/* Add task input */}
           <div className="flex gap-2">
