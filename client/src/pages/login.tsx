@@ -117,11 +117,11 @@ export default function Login() {
             Bloom
           </h1>
 
-          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-3">
-            <p className="text-sm leading-relaxed text-primary blossom-script">
+          <div className="bg-muted/50 border border-border/60 rounded-xl p-4 mb-3">
+            <p className="text-sm leading-relaxed text-foreground blossom-script">
               A gentle reminder to you that every pregnancy is unique.
             </p>
-            <p className="text-sm leading-relaxed text-primary blossom-script">
+            <p className="text-sm leading-relaxed text-foreground blossom-script">
               We are honored to help guide yours.
             </p>
           </div>

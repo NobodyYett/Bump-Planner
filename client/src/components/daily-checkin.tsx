@@ -640,6 +640,9 @@ export function DailyCheckIn({ currentWeek, appMode = "pregnancy" }: DailyCheckI
       
       <BreathingMoment mood={selectedMood} />
 
+      {/* ==================== DIVIDER BETWEEN BREATHING AND JOURNAL ==================== */}
+      <div className="mt-4 mb-2 border-t border-border/60" />
+
       {/* ==================== JOURNAL SECTION ==================== */}
       <div className="text-center mb-2 mt-3">
         <h3 className="font-serif text-2xl font-semibold">Journal</h3>
