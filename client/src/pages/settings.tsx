@@ -1,6 +1,6 @@
 // client/src/pages/settings.tsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,9 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays } from "date-fns";
-import { Loader2, Save, Sun, Moon, Monitor, Users, Lightbulb, Crown } from "lucide-react";
+import { Loader2, Save, Sun, Moon, Monitor, Users, Lightbulb, Crown, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme, type ThemeMode } from "@/theme/theme-provider";
+import { useGenderTheme, type ThemeVariant, type ThemePreference } from "@/contexts/ThemeContext";
 import { PremiumLock } from "@/components/premium-lock";
 import { usePremium } from "@/contexts/PremiumContext";
 
@@ -31,12 +32,26 @@ function parseLocalDate(dateString: string): Date | null {
   return new Date(year, month - 1, day);
 }
 
+// Helper to convert baby sex to theme variant
+function sexToTheme(sex: BabySex | null | undefined): ThemeVariant {
+  if (sex === "girl") return "girl";
+  if (sex === "boy") return "boy";
+  return "neutral";
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { mode, setMode } = useTheme();
-  const { isPartnerView, momName } = usePartnerAccess();
+  const { 
+    theme: currentTheme,
+    themePreference: currentThemePreference,
+    setTheme: setGenderTheme, 
+    setThemePreference: setGenderThemePreference,
+    babySexSource,
+  } = useGenderTheme();
+  const { isPartnerView, momName, momUserId } = usePartnerAccess();
 
   const {
     dueDate, setDueDate,
@@ -56,6 +71,9 @@ export default function SettingsPage() {
   const [partnerInput, setPartnerInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   
+  // Theme preference input state (for both Mom and Partner)
+  const [themePreferenceInput, setThemePreferenceInput] = useState<ThemePreference>("auto");
+  
   // Infancy mode state
   const [isReverting, setIsReverting] = useState(false);
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
@@ -69,13 +87,94 @@ export default function SettingsPage() {
   // Premium subscription status
   const { isPremium: isPaid, canPurchase } = usePremium();
 
+  // ============================================
+  // DRAFT THEME PREVIEW LOGIC
+  // ============================================
+  
+  // Track baselines for revert on unmount
+  const baselineThemeRef = useRef<ThemeVariant>(currentTheme);
+  const baselinePreferenceRef = useRef<ThemePreference>(currentThemePreference);
+  const baselineSexRef = useRef<BabySex>(babySex || "unknown");
+  
+  // Keep stable references for cleanup
+  const setGenderThemeRef = useRef(setGenderTheme);
+  const setGenderThemePreferenceRef = useRef(setGenderThemePreference);
+  
+  useEffect(() => {
+    setGenderThemeRef.current = setGenderTheme;
+    setGenderThemePreferenceRef.current = setGenderThemePreference;
+  }, [setGenderTheme, setGenderThemePreference]);
+
+  // Update baselines when persisted values load/change
+  useEffect(() => {
+    baselineThemeRef.current = currentTheme;
+  }, [currentTheme]);
+  
+  useEffect(() => {
+    baselinePreferenceRef.current = currentThemePreference;
+  }, [currentThemePreference]);
+  
+  useEffect(() => {
+    baselineSexRef.current = babySex || "unknown";
+  }, [babySex]);
+
+  // Revert to baseline on unmount
+  useEffect(() => {
+    return () => {
+      // Revert theme preference and theme to baseline when leaving without saving
+      setGenderThemePreferenceRef.current(baselinePreferenceRef.current);
+      if (baselinePreferenceRef.current === "neutral") {
+        setGenderThemeRef.current("neutral");
+      } else {
+        setGenderThemeRef.current(sexToTheme(baselineSexRef.current));
+      }
+    };
+  }, []);
+
+  // Apply draft theme based on current inputs
+  const applyDraftTheme = (preference: ThemePreference, sex: BabySex) => {
+    if (preference === "neutral") {
+      setGenderTheme("neutral");
+    } else {
+      // Auto mode
+      if (isPartnerView) {
+        // Partner uses mom's baby sex (from babySexSource in context)
+        setGenderTheme(sexToTheme(babySexSource));
+      } else {
+        // Mom uses draft sex input
+        setGenderTheme(sexToTheme(sex));
+      }
+    }
+  };
+
+  // Handler for theme preference change - previews immediately
+  const handleThemePreferenceChange = (newPref: ThemePreference) => {
+    setThemePreferenceInput(newPref);
+    applyDraftTheme(newPref, sexInput);
+  };
+
+  // Handler for sex selection (Mom only) - previews theme immediately
+  const handleSexChange = (newSex: "boy" | "girl" | "unknown") => {
+    setSexInput(newSex);
+    // Only apply if preference is Auto
+    if (themePreferenceInput === "auto") {
+      setGenderTheme(sexToTheme(newSex));
+    }
+  };
+
+  // ============================================
+  // END DRAFT THEME PREVIEW LOGIC
+  // ============================================
+
+  // Initialize form state from persisted values
   useEffect(() => {
     setNameInput(babyName ?? "");
     setDateInput(dueDate ? format(dueDate, "yyyy-MM-dd") : "");
     setSexInput(babySex || "unknown");
     setMomInput(profileMomName ?? "");
     setPartnerInput(partnerName ?? "");
-  }, [babyName, dueDate, babySex, profileMomName, partnerName]);
+    setThemePreferenceInput(currentThemePreference);
+  }, [babyName, dueDate, babySex, profileMomName, partnerName, currentThemePreference]);
 
   function handleTaskSuggestionsToggle(enabled: boolean) {
     setTaskSuggestionsEnabled(enabled);
@@ -90,39 +189,65 @@ export default function SettingsPage() {
   }
 
   async function handleSaveChanges() {
-    if (!user || isPartnerView) return;
+    if (!user) return;
     setIsSaving(true);
-    const sexToSave: BabySex = sexInput;
-    const parsedDueDate = parseLocalDate(dateInput);
-
-    if (parsedDueDate) {
-      const daysFromToday = differenceInDays(parsedDueDate, new Date());
-      if (daysFromToday < -30 || daysFromToday > 310) {
-        setIsSaving(false);
-        toast({ variant: "destructive", title: "That date looks unusual", description: "Please double-check the due date." });
-        return;
-      }
-    }
 
     try {
-      const { error } = await supabase
-        .from("pregnancy_profiles")
-        .update({
-          baby_name: nameInput.trim() || null,
-          due_date: dateInput.trim() || null,
-          baby_sex: sexToSave,
-          mom_name: momInput.trim() || null,
-          partner_name: partnerInput.trim() || null,
-        })
-        .eq("user_id", user.id);
+      // Save theme_preference to profiles (both Mom and Partner)
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ theme_preference: themePreferenceInput })
+        .eq("id", user.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      setBabyName(nameInput.trim() || null);
-      setDueDate(parsedDueDate);
-      setBabySex(sexToSave);
-      setMomName(momInput.trim() || null);
-      setPartnerName(partnerInput.trim() || null);
+      // Mom-only: save pregnancy details
+      if (!isPartnerView) {
+        const sexToSave: BabySex = sexInput;
+        const parsedDueDate = parseLocalDate(dateInput);
+
+        if (parsedDueDate) {
+          const daysFromToday = differenceInDays(parsedDueDate, new Date());
+          if (daysFromToday < -30 || daysFromToday > 310) {
+            setIsSaving(false);
+            toast({ variant: "destructive", title: "That date looks unusual", description: "Please double-check the due date." });
+            return;
+          }
+        }
+
+        const { error: pregnancyError } = await supabase
+          .from("pregnancy_profiles")
+          .update({
+            baby_name: nameInput.trim() || null,
+            due_date: dateInput.trim() || null,
+            baby_sex: sexToSave,
+            mom_name: momInput.trim() || null,
+            partner_name: partnerInput.trim() || null,
+          })
+          .eq("user_id", user.id);
+
+        if (pregnancyError) throw pregnancyError;
+
+        // Update local state
+        setBabyName(nameInput.trim() || null);
+        setDueDate(parsedDueDate);
+        setBabySex(sexToSave);
+        setMomName(momInput.trim() || null);
+        setPartnerName(partnerInput.trim() || null);
+
+        // Update baselines
+        baselineSexRef.current = sexToSave;
+      }
+
+      // Update baselines for theme preference
+      baselinePreferenceRef.current = themePreferenceInput;
+      if (themePreferenceInput === "neutral") {
+        baselineThemeRef.current = "neutral";
+      } else {
+        baselineThemeRef.current = isPartnerView 
+          ? sexToTheme(babySexSource)
+          : sexToTheme(sexInput);
+      }
 
       toast({ title: "Settings Saved", description: "Your details have been updated." });
     } catch (err) {
@@ -192,32 +317,79 @@ export default function SettingsPage() {
             <h2 className="text-lg font-semibold">Appearance</h2>
             <p className="text-sm text-muted-foreground">Choose how Bloom looks to you.</p>
           </div>
-          <div className="p-6 space-y-3">
-            <label className="text-sm font-medium">Theme</label>
-            <div className="flex gap-3">
-              {themeOptions.map((opt) => (
+          <div className="p-6 space-y-6">
+            {/* Light/Dark Mode */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Mode</label>
+              <div className="flex gap-3">
+                {themeOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setMode(opt.value)}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-2 border rounded-lg px-4 py-3 transition-all",
+                      mode === opt.value ? "bg-primary/10 border-primary text-primary ring-1 ring-primary/20" : "hover:bg-muted border-border"
+                    )}
+                  >
+                    {opt.icon}
+                    <span className="text-sm font-medium">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">System matches your device appearance.</p>
+            </div>
+
+            {/* Theme Preference (Auto/Neutral) - Available to both Mom and Partner */}
+            <div className="border-t border-border pt-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4 text-muted-foreground" />
+                <label className="text-sm font-medium">Color Theme</label>
+              </div>
+              <div className="flex gap-3">
                 <button
-                  key={opt.value}
                   type="button"
-                  onClick={() => setMode(opt.value)}
+                  onClick={() => handleThemePreferenceChange("auto")}
                   className={cn(
-                    "flex-1 flex items-center justify-center gap-2 border rounded-lg px-4 py-3 transition-all",
-                    mode === opt.value ? "bg-primary/10 border-primary text-primary ring-1 ring-primary/20" : "hover:bg-muted border-border"
+                    "flex-1 flex flex-col items-center justify-center gap-1 border rounded-lg px-4 py-3 transition-all",
+                    themePreferenceInput === "auto" 
+                      ? "bg-primary/10 border-primary text-primary ring-1 ring-primary/20" 
+                      : "hover:bg-muted border-border"
                   )}
                 >
-                  {opt.icon}
-                  <span className="text-sm font-medium">{opt.label}</span>
+                  <span className="text-sm font-medium">Auto</span>
+                  <span className="text-xs text-muted-foreground">
+                    {isPartnerView ? "Match baby's theme" : "Based on baby's sex"}
+                  </span>
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => handleThemePreferenceChange("neutral")}
+                  className={cn(
+                    "flex-1 flex flex-col items-center justify-center gap-1 border rounded-lg px-4 py-3 transition-all",
+                    themePreferenceInput === "neutral" 
+                      ? "bg-primary/10 border-primary text-primary ring-1 ring-primary/20" 
+                      : "hover:bg-muted border-border"
+                  )}
+                >
+                  <span className="text-sm font-medium">Neutral</span>
+                  <span className="text-xs text-muted-foreground">Always use neutral colors</span>
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {isPartnerView 
+                  ? "Auto uses the theme based on baby's sex. Neutral keeps a gender-neutral color palette."
+                  : "Auto changes colors based on baby's sex selection. Neutral keeps a gender-neutral palette regardless of selection."
+                }
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">System matches your device appearance.</p>
           </div>
         </section>
 
         {/* Notifications - Extracted Component */}
         <NotificationSettings isPartnerView={isPartnerView} />
 
-        {/* To-Do List Settings - Premium feature */}
+        {/* To-Do List Settings - Premium feature (Mom only) */}
         {!isPartnerView && (
           <PremiumLock isPaid={isPaid} message="Personalized task suggestions">
             <section className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -251,7 +423,7 @@ export default function SettingsPage() {
           </PremiumLock>
         )}
 
-        {/* Partner Access - Extracted Component */}
+        {/* Partner Access - Extracted Component (Mom only) */}
         {!isPartnerView && <PartnerAccessSection isPaid={isPaid} />}
 
         {/* Pregnancy Details - only for mom (now includes parent names) */}
@@ -277,24 +449,29 @@ export default function SettingsPage() {
                     "flex-1 flex items-center justify-center gap-2 cursor-pointer border rounded-md px-4 py-3 transition-all",
                     sexInput === "boy" ? "bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-300" : "hover:bg-muted"
                   )}>
-                    <input type="radio" name="sex" checked={sexInput === "boy"} onChange={() => setSexInput("boy")} className="sr-only" />
+                    <input type="radio" name="sex" checked={sexInput === "boy"} onChange={() => handleSexChange("boy")} className="sr-only" />
                     <span>Boy</span>
                   </label>
                   <label className={cn(
                     "flex-1 flex items-center justify-center gap-2 cursor-pointer border rounded-md px-4 py-3 transition-all",
                     sexInput === "unknown" ? "bg-muted border-border text-foreground ring-1 ring-border" : "hover:bg-muted"
                   )}>
-                    <input type="radio" name="sex" checked={sexInput === "unknown"} onChange={() => setSexInput("unknown")} className="sr-only" />
+                    <input type="radio" name="sex" checked={sexInput === "unknown"} onChange={() => handleSexChange("unknown")} className="sr-only" />
                     <span>Unknown</span>
                   </label>
                   <label className={cn(
                     "flex-1 flex items-center justify-center gap-2 cursor-pointer border rounded-md px-4 py-3 transition-all",
                     sexInput === "girl" ? "bg-pink-50 border-pink-200 text-pink-700 ring-1 ring-pink-200 dark:bg-pink-950 dark:border-pink-800 dark:text-pink-300" : "hover:bg-muted"
                   )}>
-                    <input type="radio" name="sex" checked={sexInput === "girl"} onChange={() => setSexInput("girl")} className="sr-only" />
+                    <input type="radio" name="sex" checked={sexInput === "girl"} onChange={() => handleSexChange("girl")} className="sr-only" />
                     <span>Girl</span>
                   </label>
                 </div>
+                {themePreferenceInput === "auto" && (
+                  <p className="text-xs text-muted-foreground">
+                    Theme colors will update based on your selection.
+                  </p>
+                )}
               </div>
               
               {/* Parent Names - merged from separate section */}
@@ -310,13 +487,15 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-            <div className="bg-muted/30 px-6 py-4 border-t border-border flex justify-end">
-              <Button onClick={handleSaveChanges} disabled={isSaving}>
-                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Changes</>}
-              </Button>
-            </div>
           </section>
         )}
+
+        {/* Save Button - visible to both Mom and Partner */}
+        <div className="flex justify-end">
+          <Button onClick={handleSaveChanges} disabled={isSaving}>
+            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Changes</>}
+          </Button>
+        </div>
 
         {/* Baby Arrived / Infancy Mode - only for mom */}
         {!isPartnerView && (
@@ -459,7 +638,7 @@ export default function SettingsPage() {
                   Unlock Partner View, detailed weekly insights, smart task suggestions, and more.
                 </p>
                 <Button
-                  onClick={() => setLocation("/subscribe")}
+                  onClick={() => setLocation(isPartnerView ? "/partner-paywall" : "/subscribe")}
                   className="w-full"
                 >
                   <Crown className="w-4 h-4 mr-2" />
