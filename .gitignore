@@ -82,3 +82,8 @@ supabase/.temp/
 # --- backups ---
 *.bak
 handoff_zip.sh
+
+# Editor swap files
+*.swp
+*.swo
+*.swx
